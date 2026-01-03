@@ -132,21 +132,33 @@ export default function ResearchQuestionPanel({ columnsInfo = [], nRows, nCols, 
                 {
                   type: "predict",
                   title: "Predict a numeric outcome",
-                desc: "Identify which variables explain or predict a numeric response.",
-                example: "What affects final exam scores?",
-              },
-              {
-                type: "compare_means",
-                title: "Compare group means",
-                desc: "Compare the average of a numeric outcome across two or more groups.",
-                example: "Do different teaching methods change scores?",
-              },
-              {
-                type: "association",
-                title: "Test association",
-                desc: "Check whether two variables are related.",
-                example: "Is category A associated with category B?",
-              },
+                  desc: "Identify which variables explain or predict a numeric response.",
+                  example: "What affects final exam scores?",
+                  details: [
+                    "App uses: linear regression (LR/MLR) with coefficient t-tests and overall F-test.",
+                    "Diagnostics: linearity, residual normality, variance, leverage, VIF.",
+                  ],
+                },
+                {
+                  type: "compare_means",
+                  title: "Compare group means",
+                  desc: "Compare the average of a numeric outcome across two or more groups.",
+                  example: "Do different teaching methods change scores?",
+                  details: [
+                    "App uses: t-test (2 groups) or one-way ANOVA (3+ groups).",
+                    "Diagnostics: normality within groups, equal variance, group sizes.",
+                  ],
+                },
+                {
+                  type: "association",
+                  title: "Test association",
+                  desc: "Check whether two variables are related.",
+                  example: "Is category A associated with category B?",
+                  details: [
+                    "App decides: chi-square (cat x cat), correlation (num x num), or compare-means (num x cat).",
+                    "Diagnostics: expected counts, outliers, linearity (when numeric).",
+                  ],
+                },
               ].map((card) => (
                 <button
                   key={card.type}
@@ -164,6 +176,11 @@ export default function ResearchQuestionPanel({ columnsInfo = [], nRows, nCols, 
                   <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>{card.title}</div>
                   <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 10 }}>{card.desc}</div>
                   <div style={{ fontSize: 11 }}>Example: {card.example}</div>
+                  <div style={{ marginTop: 10, fontSize: 10, color: "var(--text-muted)" }}>
+                    {card.details.map((line) => (
+                      <div key={line}>{line}</div>
+                    ))}
+                  </div>
                 </button>
               ))}
             </div>

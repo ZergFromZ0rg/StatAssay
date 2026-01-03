@@ -422,6 +422,8 @@ export default function ModelDiagnosticsPanel({ api, file, columnsInfo = [], pre
   const adjustmentsUnlocked = phase4State.ui.diagnosticsRun && adjustmentsGate.any;
   const canTransform = adjustmentsGate.transformTrigger && analysisIntent.type !== "association";
   const canExcludeOutliers = adjustmentsGate.outlierTrigger;
+  const diag = phase4State.diagnostics?.diagnostics || phase4State.diagnostics;
+  const hasDiag = !!diag;
 
   return (
     <div>
@@ -488,20 +490,23 @@ export default function ModelDiagnosticsPanel({ api, file, columnsInfo = [], pre
 
           <div style={{ border: "1px solid var(--border)", background: "var(--panel-alt)", padding: 12, marginBottom: 12 }}>
             <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>SECTION 4.3 — DIAGNOSTICS</div>
-            {phase4State.diagnostics && (
+            {!hasDiag && (
+              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Diagnostics data unavailable.</div>
+            )}
+            {hasDiag && (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
                 {analysisIntent.type === "predict" && (
                   <>
                     <div style={{ border: "1px solid var(--border)", background: "var(--panel)", padding: 10 }}>
                       <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 6 }}>Model Fit Summary</div>
-                      <div style={{ fontSize: 10 }}>Rows used: {phase4State.diagnostics.n}</div>
-                      <div style={{ fontSize: 10 }}>Predictors: {phase4State.diagnostics.p}</div>
-                      <div style={{ fontSize: 10 }}>VIF max: {phase4State.diagnostics.vif_max ?? "—"}</div>
+                      <div style={{ fontSize: 10 }}>Rows used: {diag.n ?? "—"}</div>
+                      <div style={{ fontSize: 10 }}>Predictors: {diag.p ?? "—"}</div>
+                      <div style={{ fontSize: 10 }}>VIF max: {diag.vif_max ?? "—"}</div>
                     </div>
                     <div style={{ border: "1px solid var(--border)", background: "var(--panel)", padding: 10 }}>
                       <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 6 }}>Residual checks</div>
-                      <div style={{ fontSize: 10 }}>Normality p: {phase4State.diagnostics.shapiro_p ?? "n/a"}</div>
-                      <div style={{ fontSize: 10 }}>Variance p: {phase4State.diagnostics.bp_p ?? "n/a"}</div>
+                      <div style={{ fontSize: 10 }}>Normality p-value (Shapiro–Wilk): {diag.shapiro_p ?? "n/a"}</div>
+                      <div style={{ fontSize: 10 }}>Heteroskedasticity p-value (Breusch–Pagan): {diag.bp_p ?? "n/a"}</div>
                     </div>
                   </>
                 )}
@@ -509,13 +514,13 @@ export default function ModelDiagnosticsPanel({ api, file, columnsInfo = [], pre
                   <>
                     <div style={{ border: "1px solid var(--border)", background: "var(--panel)", padding: 10 }}>
                       <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 6 }}>Group sizes</div>
-                      {(phase4State.diagnostics.group_sizes || []).map((g) => (
+                      {(diag.group_sizes || []).map((g) => (
                         <div key={g.name} style={{ fontSize: 10 }}>{g.name}: {g.n}</div>
                       ))}
                     </div>
                     <div style={{ border: "1px solid var(--border)", background: "var(--panel)", padding: 10 }}>
                       <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 6 }}>Checks</div>
-                      <div style={{ fontSize: 10 }}>Equal variance p: {phase4State.diagnostics.levene_p ?? "n/a"}</div>
+                      <div style={{ fontSize: 10 }}>Equal variance p-value (Levene): {diag.levene_p ?? "n/a"}</div>
                     </div>
                   </>
                 )}
@@ -523,12 +528,32 @@ export default function ModelDiagnosticsPanel({ api, file, columnsInfo = [], pre
                   <>
                     <div style={{ border: "1px solid var(--border)", background: "var(--panel)", padding: 10 }}>
                       <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 6 }}>Association summary</div>
-                      <div style={{ fontSize: 10 }}>Type: {phase4State.diagnostics.association_type}</div>
-                      <div style={{ fontSize: 10 }}>Correlation: {phase4State.diagnostics.correlation ?? "n/a"}</div>
+                      <div style={{ fontSize: 10 }}>Type: {diag.association_type}</div>
+                      {diag.association_type === "numeric-numeric" && (
+                        <div style={{ fontSize: 10 }}>Pearson correlation (r): {diag.correlation ?? "n/a"}</div>
+                      )}
+                      {diag.association_type === "categorical-categorical" && (
+                        <div style={{ fontSize: 10 }}>Chi-square p-value: {diag.chi2_p ?? "n/a"}</div>
+                      )}
+                      {diag.association_type === "numeric-categorical" && (
+                        <div style={{ fontSize: 10 }}>Groups detected: {diag.group_sizes?.length ?? "n/a"}</div>
+                      )}
+                      {diag.association_type === "categorical-numeric" && (
+                        <div style={{ fontSize: 10 }}>Groups detected: {diag.group_sizes?.length ?? "n/a"}</div>
+                      )}
                     </div>
                     <div style={{ border: "1px solid var(--border)", background: "var(--panel)", padding: 10 }}>
                       <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 6 }}>Checks</div>
-                      <div style={{ fontSize: 10 }}>Low expected counts: {phase4State.diagnostics.low_expected ? "Yes" : "No"}</div>
+                      {diag.association_type === "categorical-categorical" && (
+                        <div style={{ fontSize: 10 }}>Low expected counts: {diag.low_expected ? "Yes" : "No"}</div>
+                      )}
+                      {diag.association_type === "numeric-numeric" && (
+                        <div style={{ fontSize: 10 }}>Outliers flagged: {diag.outlier_count ?? 0}</div>
+                      )}
+                      {(diag.association_type === "numeric-categorical"
+                        || diag.association_type === "categorical-numeric") && (
+                        <div style={{ fontSize: 10 }}>Outliers flagged: {diag.outlier_count ?? 0}</div>
+                      )}
                     </div>
                   </>
                 )}
@@ -557,7 +582,7 @@ export default function ModelDiagnosticsPanel({ api, file, columnsInfo = [], pre
                   <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 6 }}>Outlier handling (Inference impact)</div>
                   <div style={{ fontSize: 10, marginBottom: 6 }}>Default: Flag outliers (recommended).</div>
               <div style={{ fontSize: 10, marginBottom: 6 }}>
-                Rows flagged: {phase4State.diagnostics?.outlier_count ?? 0}
+                Rows flagged: {phase4State.diagnostics?.outlier_count ?? diag?.outlier_count ?? 0}
               </div>
               <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, marginBottom: 6 }}>
                 <input
@@ -579,7 +604,7 @@ export default function ModelDiagnosticsPanel({ api, file, columnsInfo = [], pre
               {phase4State.adjustments.outlierMode === "exclude" && (
                 <>
                   <div style={{ fontSize: 10, marginBottom: 6 }}>
-                    Rows to remove: {phase4State.diagnostics?.outlier_count ?? 0}
+                    Rows to remove: {phase4State.diagnostics?.outlier_count ?? diag?.outlier_count ?? 0}
                   </div>
                   <textarea
                     value={phase4State.adjustments.justification.outliers}
@@ -687,16 +712,17 @@ export default function ModelDiagnosticsPanel({ api, file, columnsInfo = [], pre
         </>
       )}
 
-      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
-        <button
-          type="button"
-          onClick={handleContinue}
-          disabled={!phase4State.ui.diagnosticsRun}
-          style={{ ...utilBtn, fontSize: 10 }}
-        >
-          Continue
-        </button>
-      </div>
+      {phase4State.ui.diagnosticsRun && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+          <button
+            type="button"
+            onClick={handleContinue}
+            style={{ ...utilBtn, fontSize: 10 }}
+          >
+            Continue
+          </button>
+        </div>
+      )}
     </div>
   );
 }
