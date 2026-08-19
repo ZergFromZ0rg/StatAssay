@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { utilBtn } from "./uiStyles";
-import { useAnalysisIntent } from "./analysisIntentStore.jsx";
 import {
   buildPhase4LogEntry,
   deriveValidity,
@@ -9,8 +8,7 @@ import {
   validateTransformChoice,
 } from "./phase4Utils";
 
-export default function ModelDiagnosticsPanel({ api, file, columnsInfo = [], prepDecisions, prepLog, onBackToIntent, onContinueToResults }) {
-  const { analysisIntent, setAnalysisIntent } = useAnalysisIntent();
+export default function ModelDiagnosticsPanel({ api, file, columnsInfo = [], analysisIntent, prepDecisions, prepLog, onBackToIntent, onContinueToResults }) {
   const [phase4State, setPhase4State] = useState({
     diagnostics: null,
     flags: {},
@@ -19,16 +17,13 @@ export default function ModelDiagnosticsPanel({ api, file, columnsInfo = [], pre
     adjustments: {
       transformOutcome: "none",
       outlierMode: "flag",
-      outlierRule: "3xIQR",
       excludedOutlierCount: 0,
       justification: { transform: "", outliers: "" },
       confirmOutlierExclusion: false,
     },
     ui: {
       diagnosticsRun: false,
-      adjustmentsUnlocked: false,
       errors: {},
-      warnings: [],
       improvements: [],
     },
     phase4Log: [],
@@ -38,11 +33,6 @@ export default function ModelDiagnosticsPanel({ api, file, columnsInfo = [], pre
   const [error, setError] = useState("");
 
   const datasetId = file?.name || "dataset";
-  const columnsByName = useMemo(
-    () => Object.fromEntries(columnsInfo.map((col) => [col.name, col])),
-    [columnsInfo]
-  );
-
   const intentSnapshot = useMemo(() => ({
     type: analysisIntent.type,
     outcome: analysisIntent.outcome,
@@ -99,7 +89,6 @@ export default function ModelDiagnosticsPanel({ api, file, columnsInfo = [], pre
 
       const flags = json.flags || {};
       const validity = deriveValidity(flags);
-      const adjustmentsGate = shouldUnlockAdjustments(flags);
 
       setPhase4State((prev) => ({
         ...prev,
@@ -116,8 +105,6 @@ export default function ModelDiagnosticsPanel({ api, file, columnsInfo = [], pre
         ui: {
           ...prev.ui,
           diagnosticsRun: true,
-          adjustmentsUnlocked: adjustmentsGate.any,
-          warnings: json.warnings || [],
           errors: {},
           improvements: prev.ui.improvements,
         },

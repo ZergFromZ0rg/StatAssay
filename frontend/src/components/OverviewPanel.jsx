@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { utilBtn, thUtil, tdUtil } from "./uiStyles";
 
 export default function OverviewPanel({
@@ -15,8 +15,6 @@ export default function OverviewPanel({
   onRolesChange,
   onPrepLog,
   api,
-  onAnalyzeFile,
-  onFileReplace,
   onContinue,
   file,
 }) {
@@ -24,16 +22,11 @@ export default function OverviewPanel({
     drop_na: false,
     fill_mean: false,
     fill_median: false,
-    remove_outliers_iqr: false,
-    remove_outliers_zscore: false,
     drop_duplicates: false,
     drop_high_missing: false,
     missing_threshold: 50,
   });
-  const [cleaning, setCleaning] = useState(false);
   const [cleanResult, setCleanResult] = useState(null);
-  const [cleanPreview, setCleanPreview] = useState(null);
-  const [stagedFile, setStagedFile] = useState(null);
   const [missingStrategyConfirmed, setMissingStrategyConfirmed] = useState(false);
   const prevCleanOptions = useRef(cleanOptions);
   const prevMissingStrategy = useRef(missingStrategyConfirmed);
@@ -41,9 +34,7 @@ export default function OverviewPanel({
   const autoCleanInit = useRef(true);
   const autoCleanTimer = useRef(null);
 
-  // Data table editing
   const [tableData, setTableData] = useState(null);
-  const [loadingTable, setLoadingTable] = useState(false);
   const outlierThresholds = useMemo(() => {
     const thresholds = {};
     if (!describe) return thresholds;
@@ -58,10 +49,9 @@ export default function OverviewPanel({
     return thresholds;
   }, [describe]);
 
-  async function loadTableData(fileOverride = null) {
-    setLoadingTable(true);
+  const loadTableData = useCallback(async (fileOverride = null) => {
     try {
-      const sourceFile = fileOverride ?? stagedFile ?? file;
+      const sourceFile = fileOverride ?? file;
       if (!sourceFile) return;
 
       const form = new FormData();
@@ -80,16 +70,16 @@ export default function OverviewPanel({
       setTableData(json);
     } catch (e) {
       alert("Error loading data: " + e);
-    } finally {
-      setLoadingTable(false);
     }
-  }
+  }, [api, file]);
 
   useEffect(() => {
     if (!tableData) {
       loadTableData();
     }
-  }, [file, stagedFile, tableData]);
+  }, [loadTableData, tableData]);
+
+  const runAutoClean = useEffectEvent(handleClean);
 
   useEffect(() => {
     if (autoCleanInit.current) {
@@ -100,7 +90,7 @@ export default function OverviewPanel({
       clearTimeout(autoCleanTimer.current);
     }
     autoCleanTimer.current = setTimeout(() => {
-      handleClean(false);
+      runAutoClean();
     }, 400);
     return () => {
       if (autoCleanTimer.current) {
@@ -156,23 +146,17 @@ export default function OverviewPanel({
     prevMissingStrategy.current = missingStrategyConfirmed;
   }, [cleanOptions, missingStrategyConfirmed, onPrepLog]);
 
-  // Data preview only — editing is intentionally disabled.
-
-  async function handleClean(download = false) {
-    setCleaning(true);
+  async function handleClean() {
     setCleanResult(null);
-    setCleanPreview(null);
 
     try {
-      const sourceFile = file ?? stagedFile;
-
-      if (!sourceFile) {
+      if (!file) {
         alert("No file selected");
         return;
       }
 
       const form = new FormData();
-      form.append("file", sourceFile);
+      form.append("file", file);
 
       // Append all cleaning options
       Object.entries(cleanOptions).forEach(([key, value]) => {
@@ -187,44 +171,14 @@ export default function OverviewPanel({
       if (!res.ok) throw new Error(`Clean failed (HTTP ${res.status})`);
 
       // Get metadata from headers
-      const operations = res.headers.get("X-Operations");
       const originalShape = res.headers.get("X-Original-Shape");
       const newShape = res.headers.get("X-New-Shape");
       const blob = await res.blob();
-      const previewFile = new File([blob], `cleaned_${sourceFile.name || "data.csv"}`, { type: "text/csv" });
-      setStagedFile(previewFile);
+      const previewFile = new File([blob], `cleaned_${file.name || "data.csv"}`, { type: "text/csv" });
       loadTableData(previewFile);
-
-      if (download) {
-        // Download the file
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "cleaned_data.csv";
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-
-        setCleanResult({
-          operations: operations || "No operations applied",
-          originalShape,
-          newShape,
-        });
-      } else {
-        const text = await blob.text();
-        const preview = parseCsvPreview(text);
-        setCleanPreview(preview);
-        setCleanResult({
-          operations: operations || "No operations applied",
-          originalShape,
-          newShape,
-        });
-      }
+      setCleanResult({ originalShape, newShape });
     } catch (e) {
       alert("Error: " + String(e));
-    } finally {
-      setCleaning(false);
     }
   }
 
@@ -874,68 +828,6 @@ function isReadyToContinue({ columns, nunique, rows, columnRoles, cleanOptions, 
     return inferred === "predictor";
   });
   return idResolved && missingResolved && predictors.length > 0;
-}
-
-function parseCsvPreview(text, maxRows = null) {
-  const rows = [];
-  let row = [];
-  let field = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < text.length; i += 1) {
-    const ch = text[i];
-    const next = text[i + 1];
-
-    if (ch === "\"") {
-      if (inQuotes && next === "\"") {
-        field += "\"";
-        i += 1;
-      } else {
-        inQuotes = !inQuotes;
-      }
-      continue;
-    }
-
-    if (!inQuotes && (ch === "," || ch === "\n" || ch === "\r")) {
-      if (ch === "\r" && next === "\n") {
-        i += 1;
-      }
-      row.push(field);
-      field = "";
-      if (ch !== ",") {
-        if (row.length > 1 || row[0] !== "") {
-          rows.push(row);
-        }
-        row = [];
-        if (maxRows !== null && rows.length >= maxRows + 1) {
-          break;
-        }
-      }
-      continue;
-    }
-
-    field += ch;
-  }
-
-  if (field.length > 0 || row.length > 0) {
-    row.push(field);
-    rows.push(row);
-  }
-
-  if (rows.length === 0) {
-    return { columns: [], rows: [] };
-  }
-
-  const header = rows[0];
-  const body = maxRows === null ? rows.slice(1) : rows.slice(1, maxRows + 1);
-  const normalizedBody = body.map((r) => {
-    if (r.length < header.length) {
-      return r.concat(Array(header.length - r.length).fill(""));
-    }
-    return r.slice(0, header.length);
-  });
-
-  return { columns: header, rows: normalizedBody };
 }
 
 function StatUtil({ label, value }) {

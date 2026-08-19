@@ -1,20 +1,17 @@
 import { useMemo } from "react";
 import { utilBtn } from "./uiStyles";
-import { useAnalysisIntent } from "./analysisIntentStore.jsx";
 import {
   buildIntentLogEntry,
   getEligibleColumns,
   getNumericColumns,
   getCategoricalColumns,
-  mockColumns,
   validateAssociation,
   validateCompareMeans,
   validatePredict,
 } from "./analysisIntentUtils";
 
-export default function ResearchQuestionPanel({ columnsInfo = [], nRows, nCols, onProceed, onBack }) {
-  const { analysisIntent, setAnalysisIntent } = useAnalysisIntent();
-  const columns = columnsInfo.length ? columnsInfo : mockColumns;
+export default function ResearchQuestionPanel({ columnsInfo = [], analysisIntent, setAnalysisIntent, onProceed, onBack }) {
+  const columns = columnsInfo;
 
   const eligibleColumns = useMemo(() => getEligibleColumns(columns), [columns]);
   const numericColumns = useMemo(() => getNumericColumns(eligibleColumns), [eligibleColumns]);

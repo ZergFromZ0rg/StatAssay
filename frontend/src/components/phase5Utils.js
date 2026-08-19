@@ -114,13 +114,12 @@ function invertMatrix(A) {
 }
 
 function regularizedInverse(A) {
-  const n = A.length;
   const regularized = A.map((row, i) => row.map((v, j) => v + (i === j ? 1e-8 : 0)));
   return invertMatrix(regularized);
 }
 
 function logGamma(z) {
-  const cof = [76.18009172947146, -86.50532032941677, 24.01409824083091,
+  const cof = [76.1800917294715, -86.5053203294168, 24.01409824083091,
     -1.231739572450155, 0.001208650973866179, -0.000005395239384953];
   let x = z;
   let y = z;
@@ -131,7 +130,7 @@ function logGamma(z) {
     y += 1;
     ser += cof[j] / y;
   }
-  return -tmp + Math.log(2.5066282746310005 * ser / x);
+  return -tmp + Math.log(2.506628274631 * ser / x);
 }
 
 function betacf(a, b, x) {
@@ -432,7 +431,6 @@ export function buildFinalDataset(bundle) {
   const raw = preparedDatasetState.rawData || [];
   const prep = preparedDatasetState.prepDecisions || {};
   const columnsInfo = preparedDatasetState.columns || [];
-  const columnsByName = Object.fromEntries(columnsInfo.map((c) => [c.name, c]));
 
   let data = raw.map((row) => ({ ...row }));
   const nOriginal = data.length;

@@ -1,5 +1,4 @@
 export function deriveValidity(flags = {}) {
-  const reasons = [];
   const severe = [];
   const warnings = [];
 

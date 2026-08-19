@@ -114,11 +114,3 @@ export function validateAssociation({ varA, varB, columnsByName }) {
 
   return { errors, warnings, note, isValid: Object.keys(errors).length === 0 };
 }
-
-export const mockColumns = [
-  { name: "student_id", detectedType: "numeric", role: "identifier", uniqueRatio: 1, missingPct: 0, levelsCount: null },
-  { name: "age", detectedType: "numeric", role: "predictor", uniqueRatio: 0.12, missingPct: 0.02 },
-  { name: "attendance_pct", detectedType: "numeric", role: "predictor", uniqueRatio: 0.45, missingPct: 0 },
-  { name: "final_score", detectedType: "numeric", role: "predictor", uniqueRatio: 0.3, missingPct: 0 },
-  { name: "teaching_method", detectedType: "categorical", role: "predictor", uniqueRatio: 0.08, missingPct: 0, levelsCount: 4 },
-];

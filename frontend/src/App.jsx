@@ -1,31 +1,36 @@
 import { useEffect, useMemo, useState } from "react";
 import "./App.css";
-import AiDiagnosticsPanel from "./components/AiDiagnosticsPanel";
-import InfoPanel from "./components/InfoPanel";
-import HypothesisTestingPanel from "./components/HypothesisTestingPanel";
-import DistributionPanel from "./components/DistributionPanel";
-import VisualizationsPanel from "./components/VisualizationsPanel";
-import ReportBuilderPanel from "./components/ReportBuilderPanel";
 import OverviewPanel from "./components/OverviewPanel";
-import RelationshipsPanel from "./components/RelationshipsPanel";
-import RegressionPanel from "./components/RegressionPanel";
 import ResearchQuestionPanel from "./components/ResearchQuestionPanel";
 import ModelDiagnosticsPanel from "./components/ModelDiagnosticsPanel";
 import ResultsPanel from "./components/ResultsPanel";
-import { AnalysisIntentProvider } from "./components/analysisIntentStore.jsx";
 
 const API = "http://127.0.0.1:5000";
+const EMPTY_ARRAY = [];
+const EMPTY_OBJECT = {};
+const INITIAL_ANALYSIS_INTENT = {
+  type: null,
+  outcome: "",
+  predictors: [],
+  group: "",
+  varA: "",
+  varB: "",
+  warnings: [],
+  errors: {},
+  note: "",
+  intentLog: [],
+};
 
 export default function App() {
   const [file, setFile] = useState(null);
-  const [active, setActive] = useState("about");
+  const [active, setActive] = useState("overview");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
-  const [reportData, setReportData] = useState({});
   const [columnRoles, setColumnRoles] = useState({});
   const [prepLog, setPrepLog] = useState([]);
   const [resultsBundle, setResultsBundle] = useState(null);
+  const [analysisIntent, setAnalysisIntent] = useState(INITIAL_ANALYSIS_INTENT);
 
   async function analyzeFile(selectedFile) {
     setErr("");
@@ -45,9 +50,9 @@ export default function App() {
 
       const json = await res.json();
       setData(json);
-      setReportData({});
       setColumnRoles({});
       setPrepLog([]);
+      setAnalysisIntent(INITIAL_ANALYSIS_INTENT);
       setActive("overview");
     } catch (e) {
       if (e?.name === "AbortError") {
@@ -62,21 +67,11 @@ export default function App() {
     }
   }
 
-  async function analyze() {
-    await analyzeFile(file);
-  }
-
-  function updateReportData(section, payload) {
-    setReportData((prev) => ({ ...prev, [section]: payload }));
-  }
-
-  const columns = data?.columns ?? [];
-  const missing = data?.missing_by_column ?? {};
+  const columns = data?.columns ?? EMPTY_ARRAY;
+  const missing = data?.missing_by_column ?? EMPTY_OBJECT;
   const describe = data?.describe ?? null;
-  const corr = data?.corr ?? null;
   const shape = data?.shape ?? null;
-  const categoricalColumns = data?.categorical_columns ?? [];
-  const nunique = data?.nunique ?? {};
+  const nunique = data?.nunique ?? EMPTY_OBJECT;
   const duplicateRows = data?.duplicate_rows ?? { count: 0, indices: [] };
   const extremeValueFlags = data?.extreme_value_flags ?? {};
   const distributionFlags = data?.distribution_flags ?? {};
@@ -85,21 +80,6 @@ export default function App() {
     if (!describe) return [];
     return Object.keys(describe);
   }, [describe]);
-
-  const analysisColumns = useMemo(
-    () => columns.filter((col) => columnRoles[col] !== "identifier"),
-    [columns, columnRoles]
-  );
-
-  const analysisNumericColumns = useMemo(
-    () => numericColumns.filter((col) => columnRoles[col] !== "identifier"),
-    [numericColumns, columnRoles]
-  );
-
-  const analysisCategoricalColumns = useMemo(
-    () => categoricalColumns.filter((col) => columnRoles[col] !== "identifier"),
-    [categoricalColumns, columnRoles]
-  );
 
   const columnsInfo = useMemo(() => {
     const rows = Number(shape?.rows) || 0;
@@ -159,8 +139,7 @@ export default function App() {
   }, [columns, nunique, shape]);
 
   return (
-    <AnalysisIntentProvider>
-      <div
+    <div
         style={{
           width: "100%",
           minHeight: "100vh",
@@ -197,7 +176,7 @@ export default function App() {
                     }}
                   />
                   <button
-                    onClick={analyze}
+                    onClick={() => analyzeFile(file)}
                     disabled={loading || !file}
                     style={{
                       padding: "10px 18px",
@@ -228,9 +207,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Content area - always render both, use CSS to show/hide */}
         <div style={{ padding: 12, minHeight: 200 }}>
-          {/* Panels */}
           <div style={{ display: data ? "block" : "none", position: "relative" }}>
             {loading && (
               <div
@@ -270,8 +247,6 @@ export default function App() {
                     onRolesChange={setColumnRoles}
                     onPrepLog={(entry) => setPrepLog((prev) => [...prev, entry])}
                     api={API}
-                    onAnalyzeFile={analyzeFile}
-                    onFileReplace={setFile}
                     onContinue={() => setActive("research-question")}
                     file={file}
                   />
@@ -279,8 +254,8 @@ export default function App() {
                 <div style={{ display: active === "research-question" ? "block" : "none" }}>
                   <ResearchQuestionPanel
                     columnsInfo={columnsInfo}
-                    nRows={shape?.rows ?? 0}
-                    nCols={shape?.cols ?? 0}
+                    analysisIntent={analysisIntent}
+                    setAnalysisIntent={setAnalysisIntent}
                     onProceed={() => setActive("model-diagnostics")}
                     onBack={() => setActive("overview")}
                   />
@@ -290,6 +265,7 @@ export default function App() {
                     api={API}
                     file={file}
                     columnsInfo={columnsInfo}
+                    analysisIntent={analysisIntent}
                     prepDecisions={prepDecisions}
                     prepLog={prepLog}
                     onBackToIntent={() => setActive("research-question")}
@@ -307,70 +283,12 @@ export default function App() {
                     onBackToPhase4={() => setActive("model-diagnostics")}
                   />
                 </div>
-                <div style={{ display: active === "info" ? "block" : "none" }}>
-                  <InfoPanel />
-                </div>
-                <div style={{ display: active === "relationships" ? "block" : "none" }}>
-                  <RelationshipsPanel corr={corr} numericColumns={analysisNumericColumns} />
-                </div>
-                <div style={{ display: active === "visualizations" ? "block" : "none" }}>
-                  <VisualizationsPanel
-                    numericColumns={analysisNumericColumns}
-                    api={API}
-                    file={file}
-                    onReportUpdate={(payload) => updateReportData("visualizations", payload)}
-                  />
-                </div>
-                <div style={{ display: active === "hypothesis" ? "block" : "none" }}>
-                  <HypothesisTestingPanel
-                    columns={analysisColumns}
-                    numericColumns={analysisNumericColumns}
-                    categoricalColumns={analysisCategoricalColumns}
-                    api={API}
-                    file={file}
-                    onReportUpdate={(payload) => updateReportData("hypothesis", payload)}
-                  />
-                </div>
-                <div style={{ display: active === "distribution" ? "block" : "none" }}>
-                  <DistributionPanel
-                    numericColumns={analysisNumericColumns}
-                    api={API}
-                    file={file}
-                    onReportUpdate={(payload) => updateReportData("distribution", payload)}
-                  />
-                </div>
-                <div style={{ display: active === "regression" ? "block" : "none" }}>
-                  <RegressionPanel
-                    numericColumns={analysisNumericColumns}
-                    columnRoles={columnRoles}
-                    file={file}
-                    api={API}
-                    onReportUpdate={(payload) => updateReportData("regression", payload)}
-                  />
-                </div>
-                <div style={{ display: active === "ai-diagnostics" ? "block" : "none" }}>
-                  <AiDiagnosticsPanel />
-                </div>
-                <div style={{ display: active === "pdf-export" ? "block" : "none" }}>
-                  <ReportBuilderPanel
-                    reportData={reportData}
-                    shape={shape}
-                    columns={columns}
-                    missing={missing}
-                    corr={corr}
-                    numericColumns={analysisNumericColumns}
-                    prepLog={prepLog}
-                  />
-                </div>
               </>
             )}
           </div>
-
-          {!data && null}
         </div>
       </div>
-      </div>
-    </AnalysisIntentProvider>
+    </div>
   );
 }
 
