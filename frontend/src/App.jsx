@@ -5,7 +5,7 @@ import ResearchQuestionPanel from "./components/ResearchQuestionPanel";
 import ModelDiagnosticsPanel from "./components/ModelDiagnosticsPanel";
 import ResultsPanel from "./components/ResultsPanel";
 
-const API = "http://127.0.0.1:5000";
+const API = "http://127.0.0.1:8000";
 const EMPTY_ARRAY = [];
 const EMPTY_OBJECT = {};
 const INITIAL_ANALYSIS_INTENT = {
