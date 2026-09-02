@@ -57,6 +57,21 @@ def test_infer_attaches_charts():
     assert chart["trend"] is not None
 
 
+def test_infer_attaches_contingency_chart():
+    rows = ["cat,region"]
+    for i in range(120):
+        cat = "A" if i % 2 else "B"
+        region = ("north" if i % 2 else "south") if i % 10 else ("south" if i % 2 else "north")
+        rows.append(f"{cat},{region}")
+    body = _post("\n".join(rows).encode()).json()
+    cont = [f for f in body["findings"] + body["needs_review"] if f["family"] == "contingency"]
+    assert cont, "expected a contingency finding for two strongly associated categoricals"
+    chart = cont[0]["chart"]
+    assert chart["type"] == "contingency"
+    assert len(chart["counts"]) == len(chart["rows"])
+    assert all(len(r) == len(chart["cols"]) for r in chart["counts"])
+
+
 def test_infer_rejects_garbage():
     r = _post(b"\x00\x01\x02 not a csv at all \xff", "junk.bin")
     assert r.status_code == 400

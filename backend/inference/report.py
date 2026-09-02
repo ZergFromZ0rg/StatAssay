@@ -145,6 +145,11 @@ def _attach_charts(entries: list[dict], cc_df: pd.DataFrame) -> None:
             if boxes:
                 chart = {"type": "box", "num": num, "cat": cat, "groups": boxes,
                          "higher_group": e.get("stats", {}).get("higher_group")}
+        elif e["family"] == "contingency":
+            a, b = e["vars"]
+            series = _charts.contingency_series(e.get("stats", {}).get("table", {}), a, b)
+            if series:
+                chart = {"type": "contingency", **series}
         if chart:
             e["chart"] = chart
 

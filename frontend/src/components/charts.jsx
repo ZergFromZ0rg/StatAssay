@@ -7,6 +7,12 @@ const INK = "var(--text)";
 const MUTED = "var(--text-muted)";
 const ACCENT = "var(--accent)";
 
+/* Small categorical ramp, chosen to stay legible on the light-green ground.
+   Beyond its length the colours repeat at reduced opacity. */
+const CAT_COLORS = ["#2f7d4b", "#b07d2b", "#4f6d8c", "#9c5b4e", "#6a8f5f", "#7a5c8c", "#4a4a4a"];
+const catColor = (i) => CAT_COLORS[i % CAT_COLORS.length];
+const catOpacity = (i) => (i < CAT_COLORS.length ? 1 : i < CAT_COLORS.length * 2 ? 0.6 : 0.35);
+
 function niceNum(v) {
   if (v === null || v === undefined || Number.isNaN(v)) return "—";
   const a = Math.abs(v);
@@ -185,9 +191,70 @@ export function BoxPlot({ chart, width = 300, rowH = 26 }) {
   );
 }
 
+/* --------------------------------------------------------------------- */
+/* Contingency: one 100%-stacked bar per row level                       */
+/* --------------------------------------------------------------------- */
+export function ContingencyBars({ chart, width = 300, rowH = 22 }) {
+  const { rows, cols, counts, row_shares: shares, row_totals: totals } = chart ?? {};
+  if (!rows?.length || !cols?.length) return null;
+  const w = width;
+  const labelW = Math.min(96, Math.max(30, ...rows.map((r) => r.length * 6 + 6)));
+  const totW = 30;
+  const gap = 6;
+  const barW = w - labelW - totW - gap * 2;
+  const h = rows.length * rowH + 4;
+
+  return (
+    <figure style={{ margin: "6px 0 0" }}>
+      <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} role="img"
+           aria-label={`${chart.col_var} composition by ${chart.row_var}`} style={{ display: "block" }}>
+        {rows.map((r, ri) => {
+          const y = ri * rowH + 2;
+          let x = labelW + gap;
+          return (
+            <g key={r}>
+              <text x={0} y={y + rowH / 2 + 3} fontSize="9" fill={INK}>
+                {r.length > 15 ? r.slice(0, 14) + "…" : r}
+              </text>
+              {shares[ri].map((s, ci) => {
+                const segW = s * barW;
+                const seg = (
+                  <rect key={ci} x={x} y={y + 3} width={Math.max(segW, 0)} height={rowH - 8}
+                        fill={catColor(ci)} opacity={catOpacity(ci)}
+                        stroke="var(--panel)" strokeWidth="0.5">
+                    <title>{`${r} · ${cols[ci]}: ${counts[ri][ci]} (${(s * 100).toFixed(0)}%)`}</title>
+                  </rect>
+                );
+                x += segW;
+                return seg;
+              })}
+              <text x={w} y={y + rowH / 2 + 3} fontSize="8" fill={MUTED} textAnchor="end">
+                {totals[ri]}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 10px", marginTop: 4 }}>
+        {cols.map((c, ci) => (
+          <span key={c} style={{ fontSize: 9, color: MUTED, display: "inline-flex", alignItems: "center", gap: 3 }}>
+            <span style={{ width: 8, height: 8, background: catColor(ci), opacity: catOpacity(ci), display: "inline-block" }} />
+            {c}
+          </span>
+        ))}
+      </div>
+      <figcaption style={{ fontSize: 9, color: MUTED, marginTop: 2 }}>
+        {chart.col_var} within each {chart.row_var} · bar = 100%, number = row count
+        {chart.truncated ? " · rarer levels not shown" : ""}
+      </figcaption>
+    </figure>
+  );
+}
+
 export function FindingChart({ chart }) {
   if (!chart) return null;
   if (chart.type === "scatter") return <Scatter chart={chart} />;
   if (chart.type === "box") return <BoxPlot chart={chart} />;
+  if (chart.type === "contingency") return <ContingencyBars chart={chart} />;
   return null;
 }

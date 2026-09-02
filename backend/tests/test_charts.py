@@ -69,3 +69,33 @@ def test_group_box_series_orders_by_levels():
     out = charts.group_box_series(df, "v", "g", ["b", "a"])
     assert [row["level"] for row in out] == ["b", "a"]
     assert out[0]["median"] == 11.0
+
+
+def test_contingency_series_shape_and_ordering():
+    table = {
+        "red": {"circle": 40, "square": 10},
+        "blue": {"circle": 5, "square": 45},
+        "green": {"circle": 1, "square": 1},
+    }
+    s = charts.contingency_series(table, "color", "shape")
+    # rows by descending total then name: blue(50), red(50), green(2)
+    assert s["rows"] == ["blue", "red", "green"]
+    # cols by descending total: square(56), circle(46)
+    assert s["cols"] == ["square", "circle"]
+    assert s["n"] == 102
+    for row_share in s["row_shares"]:
+        assert abs(sum(row_share) - 1.0) < 1e-9
+    ri, ci = s["rows"].index("red"), s["cols"].index("circle")
+    assert s["counts"][ri][ci] == 40
+
+
+def test_contingency_series_caps_levels():
+    table = {f"r{i}": {f"c{j}": 1 for j in range(20)} for i in range(20)}
+    s = charts.contingency_series(table, "a", "b")
+    assert len(s["rows"]) == charts.CONTINGENCY_MAX_LEVELS
+    assert len(s["cols"]) == charts.CONTINGENCY_MAX_LEVELS
+    assert s["truncated"] is True
+
+
+def test_contingency_series_empty():
+    assert charts.contingency_series({}, "a", "b") is None

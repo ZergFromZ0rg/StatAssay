@@ -144,3 +144,44 @@ def group_box_series(df: pd.DataFrame, num: str, cat: str, levels: list[str]) ->
         if stats:
             out.append({"level": lv, **stats})
     return out
+
+
+CONTINGENCY_MAX_LEVELS = 12
+
+
+def contingency_series(table: dict, row_var: str, col_var: str) -> dict | None:
+    """Reshape a crosstab into an ordered counts matrix plus row-normalised shares.
+
+    ``table`` is ``{row_level: {col_level: count}}`` (as the sweep already stores it).
+    Rows and columns are ordered by descending total so the largest segments come
+    first; both are capped so the picture stays readable.
+    """
+    if not table:
+        return None
+    col_totals: dict[str, int] = {}
+    for row in table.values():
+        for c, v in row.items():
+            col_totals[c] = col_totals.get(c, 0) + int(v)
+    row_totals = {r: sum(int(v) for v in row.values()) for r, row in table.items()}
+    if not col_totals or not row_totals:
+        return None
+
+    rows = sorted(row_totals, key=lambda r: (-row_totals[r], str(r)))[:CONTINGENCY_MAX_LEVELS]
+    cols = sorted(col_totals, key=lambda c: (-col_totals[c], str(c)))[:CONTINGENCY_MAX_LEVELS]
+
+    counts = [[int(table.get(r, {}).get(c, 0)) for c in cols] for r in rows]
+    shares = [
+        [(v / t if t else 0.0) for v in row]
+        for row, t in zip(counts, (sum(row) for row in counts))
+    ]
+    return {
+        "row_var": row_var,
+        "col_var": col_var,
+        "rows": [str(r) for r in rows],
+        "cols": [str(c) for c in cols],
+        "counts": counts,
+        "row_shares": shares,
+        "row_totals": [sum(row) for row in counts],
+        "n": sum(sum(row) for row in counts),
+        "truncated": len(row_totals) > len(rows) or len(col_totals) > len(cols),
+    }
