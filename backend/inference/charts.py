@@ -185,3 +185,39 @@ def contingency_series(table: dict, row_var: str, col_var: str) -> dict | None:
         "n": sum(sum(row) for row in counts),
         "truncated": len(row_totals) > len(rows) or len(col_totals) > len(cols),
     }
+
+
+CORRELATION_MATRIX_MAX = 24
+
+
+def correlation_matrix(numeric_cols: list[str], correlation_rows: list[dict]) -> dict | None:
+    """A symmetric r-matrix for the numeric columns, built from the sweep results.
+
+    Only the upper triangle (plus the unit diagonal) is emitted as ``cells``; the
+    frontend mirrors it. Cells for pairs that were never tested (too few complete
+    rows, no variance) are simply absent.
+    """
+    cols = numeric_cols[:CORRELATION_MATRIX_MAX]
+    if len(cols) < 2:
+        return None
+    idx = {c: i for i, c in enumerate(cols)}
+
+    cells = [{"i": i, "j": i, "value": 1.0, "q": None, "kind": "identity", "n": None}
+             for i in range(len(cols))]
+    for r in correlation_rows:
+        a, b = r["vars"]
+        if a not in idx or b not in idx:
+            continue
+        i, j = sorted((idx[a], idx[b]))
+        cells.append({
+            "i": i, "j": j,
+            "value": r["effect_value"],
+            "q": r.get("q_value"),
+            "kind": r["kind"],
+            "n": r["n"],
+        })
+    return {
+        "columns": cols,
+        "cells": cells,
+        "truncated": len(numeric_cols) > len(cols),
+    }

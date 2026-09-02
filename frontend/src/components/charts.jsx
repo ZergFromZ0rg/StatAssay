@@ -251,6 +251,93 @@ export function ContingencyBars({ chart, width = 300, rowH = 22 }) {
   );
 }
 
+/* --------------------------------------------------------------------- */
+/* Correlation heatmap                                                   */
+/* --------------------------------------------------------------------- */
+const POS_HUE = [47, 125, 75]; // accent green
+const NEG_HUE = [79, 109, 140]; // slate blue
+
+function heatFill(v) {
+  if (v === null || v === undefined || Number.isNaN(v)) return "var(--panel-strong)";
+  const mag = Math.min(Math.abs(v), 1);
+  const [r, g, b] = v >= 0 ? POS_HUE : NEG_HUE;
+  const a = 0.08 + 0.82 * mag;
+  return `rgba(${r}, ${g}, ${b}, ${a.toFixed(3)})`;
+}
+
+function shortLabel(s, n = 12) {
+  return s.length > n ? s.slice(0, n - 1) + "…" : s;
+}
+
+export function CorrelationHeatmap({ matrix, maxWidth = 460 }) {
+  const cols = matrix?.columns ?? [];
+  const N = cols.length;
+  if (N < 2) return null;
+
+  const lookup = new Map(); // "i,j" -> cell (upper triangle + diagonal)
+  for (const c of matrix.cells) lookup.set(`${c.i},${c.j}`, c);
+  const at = (i, j) => lookup.get(i <= j ? `${i},${j}` : `${j},${i}`);
+
+  const labelW = 78;
+  const topH = 54;
+  const cell = Math.max(13, Math.min(30, Math.floor((maxWidth - labelW) / N)));
+  const grid = N * cell;
+  const w = labelW + grid + 4;
+  const h = topH + grid + 4;
+  const showText = cell >= 22;
+
+  return (
+    <figure style={{ margin: "0 0 12px", overflowX: "auto" }}>
+      <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} role="img"
+           aria-label="Correlation matrix of the numeric columns" style={{ display: "block" }}>
+        {cols.map((c, j) => (
+          <text key={`ct-${c}`} x={labelW + j * cell + cell / 2} y={topH - 4}
+                fontSize="8" fill={INK} textAnchor="start"
+                transform={`rotate(-45 ${labelW + j * cell + cell / 2} ${topH - 4})`}>
+            {shortLabel(c, 14)}
+          </text>
+        ))}
+        {cols.map((rowName, i) => (
+          <g key={`row-${rowName}`}>
+            <text x={labelW - 4} y={topH + i * cell + cell / 2 + 3} fontSize="8"
+                  fill={INK} textAnchor="end">{shortLabel(rowName)}</text>
+            {cols.map((colName, j) => {
+              const c = at(i, j);
+              const v = c ? c.value : null;
+              const x = labelW + j * cell;
+              const y = topH + i * cell;
+              return (
+                <g key={`${i}-${j}`}>
+                  <rect x={x} y={y} width={cell - 1} height={cell - 1}
+                        fill={heatFill(v)} stroke="var(--panel)" strokeWidth="0.5">
+                    <title>
+                      {c && c.kind !== "identity"
+                        ? `${rowName} × ${colName}: ${c.kind === "spearman" ? "ρ" : "r"} = ${v.toFixed(2)} · q = ${c.q == null ? "—" : c.q.toExponential(1)} · n = ${c.n}`
+                        : i === j
+                        ? rowName
+                        : `${rowName} × ${colName}: not tested`}
+                    </title>
+                  </rect>
+                  {showText && v !== null && i !== j && (
+                    <text x={x + (cell - 1) / 2} y={y + (cell - 1) / 2 + 3} fontSize="8"
+                          fill={INK} textAnchor="middle">
+                      {v.toFixed(2).replace(/^(-?)0\./, "$1.")}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
+          </g>
+        ))}
+      </svg>
+      <figcaption style={{ fontSize: 9, color: MUTED, marginTop: 2 }}>
+        Pearson / Spearman r · green = positive, blue = negative, blank = not tested
+        {matrix.truncated ? ` · first ${N} numeric columns` : ""}
+      </figcaption>
+    </figure>
+  );
+}
+
 export function FindingChart({ chart }) {
   if (!chart) return null;
   if (chart.type === "scatter") return <Scatter chart={chart} />;

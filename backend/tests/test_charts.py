@@ -99,3 +99,36 @@ def test_contingency_series_caps_levels():
 
 def test_contingency_series_empty():
     assert charts.contingency_series({}, "a", "b") is None
+
+
+def _corr_row(a, b, value, kind="pearson", q=0.01, n=100):
+    return {"vars": [a, b], "effect_value": value, "kind": kind, "q_value": q, "n": n}
+
+
+def test_correlation_matrix_diagonal_and_mirroring():
+    cols = ["x", "y", "z"]
+    rows = [_corr_row("x", "y", 0.8), _corr_row("y", "z", -0.4)]
+    m = charts.correlation_matrix(cols, rows)
+    assert m["columns"] == cols
+    diag = [c for c in m["cells"] if c["i"] == c["j"]]
+    assert len(diag) == 3 and all(c["value"] == 1.0 for c in diag)
+    # only the upper triangle is stored
+    xy = next(c for c in m["cells"] if (c["i"], c["j"]) == (0, 1))
+    assert xy["value"] == 0.8 and xy["kind"] == "pearson"
+    assert not any((c["i"], c["j"]) == (1, 0) for c in m["cells"])
+
+
+def test_correlation_matrix_ignores_unknown_columns():
+    m = charts.correlation_matrix(["x", "y"], [_corr_row("x", "gone", 0.9)])
+    assert [c for c in m["cells"] if c["i"] != c["j"]] == []
+
+
+def test_correlation_matrix_needs_two_columns():
+    assert charts.correlation_matrix(["only"], []) is None
+
+
+def test_correlation_matrix_caps_and_flags_truncation():
+    cols = [f"c{i}" for i in range(40)]
+    m = charts.correlation_matrix(cols, [])
+    assert len(m["columns"]) == charts.CORRELATION_MATRIX_MAX
+    assert m["truncated"] is True

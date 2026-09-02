@@ -211,5 +211,8 @@ def run_inference(df: pd.DataFrame, raw_df: pd.DataFrame, filename: str) -> dict
         "all_results": _all_results(primary),
         "methodology": METHODOLOGY,
     }
+    report["all_results"]["correlation_matrix"] = _charts.correlation_matrix(
+        numeric_cols, primary.get("correlation", [])
+    )
     report["report_markdown"] = _markdown(report)
     return _sanitize(report)

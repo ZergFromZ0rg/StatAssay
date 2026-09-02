@@ -1,5 +1,6 @@
 import { card, sectionTitle, thUtil, tdUtil } from "./uiStyles";
 import { fmt } from "./reportHelpers";
+import { CorrelationHeatmap } from "./charts";
 
 const GROUPS = [
   { key: "correlations", label: "Correlations (numeric × numeric)" },
@@ -65,6 +66,9 @@ export default function AllResults({ allResults, sweep }) {
           ? ` · ${sweep.excluded_columns.length} column(s) dropped by the ${sweep.column_cap}-column cap`
           : ""}
       </div>
+      {allResults?.correlation_matrix && (
+        <CorrelationHeatmap matrix={allResults.correlation_matrix} />
+      )}
       {GROUPS.map((g) => (
         <details key={g.key} style={{ marginBottom: 6, border: "1px solid var(--border)", background: "var(--panel)" }}>
           <summary style={{ cursor: "pointer", padding: "6px 8px", fontSize: 11, fontWeight: 700, background: "var(--panel-strong)" }}>

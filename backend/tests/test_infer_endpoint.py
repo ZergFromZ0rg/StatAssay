@@ -56,6 +56,11 @@ def test_infer_attaches_charts():
     assert len(chart["points"]) == chart["n"]
     assert chart["trend"] is not None
 
+    matrix = body["all_results"]["correlation_matrix"]
+    assert matrix["columns"] == ["a", "b"]
+    ab = next(c for c in matrix["cells"] if (c["i"], c["j"]) == (0, 1))
+    assert ab["value"] > 0.99  # a and b are perfectly collinear
+
 
 def test_infer_attaches_contingency_chart():
     rows = ["cat,region"]
