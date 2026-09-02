@@ -55,6 +55,25 @@ def test_scatter_deterministic(rng):
     assert a["points"] == b["points"]
 
 
+def test_residual_series_shape_and_subsampling(rng):
+    fitted = rng.normal(0, 1, 500)
+    resid = rng.normal(0, 1, 500)
+    s = charts.residual_series(fitted, resid, cap=150)
+    assert s["n"] == 500
+    assert s["sampled"] is True
+    assert len(s["points"]) == 150
+    assert len(s["fitted_lim"]) == 2 and s["resid_lim"][0] < s["resid_lim"][1]
+
+
+def test_residual_series_drops_non_finite():
+    s = charts.residual_series([1.0, 2.0, np.nan, 4.0, 5.0], [0.1, np.inf, 0.3, -0.2, 0.05])
+    assert s["n"] == 3
+
+
+def test_residual_series_too_small():
+    assert charts.residual_series([1.0, 2.0], [0.1, 0.2]) is None
+
+
 def test_box_stats_quartile_order():
     b = charts.box_stats(np.array([1.0, 2, 3, 4, 5, 6, 7, 8, 9, 100]))
     assert b["min"] <= b["q1"] <= b["median"] <= b["q3"] <= b["max"]

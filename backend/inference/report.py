@@ -55,7 +55,9 @@ def _all_results(sweep: dict) -> dict:
                     "effect_name": r["effect_name"], "effect_value": r["effect_value"],
                     "effect_magnitude": r["effect_magnitude"], "direction": r["direction"],
                     "assumptions": r["assumptions"], "nonparametric_agrees": r["nonparametric_agrees"],
-                    "extra": r["extra"],
+                    # resid_plot is a chart payload for the headline findings only —
+                    # keep the full results table lean.
+                    "extra": {k: v for k, v in r["extra"].items() if k != "resid_plot"},
                 }
                 for r in rows
             ),
@@ -150,6 +152,11 @@ def _attach_charts(entries: list[dict], cc_df: pd.DataFrame) -> None:
             series = _charts.contingency_series(e.get("stats", {}).get("table", {}), a, b)
             if series:
                 chart = {"type": "contingency", **series}
+        elif e["family"] == "regression_model":
+            rp = e.get("stats", {}).pop("resid_plot", None)
+            if rp:
+                chart = {"type": "residual", "outcome": e["vars"][0],
+                         "bp_p": e.get("stats", {}).get("bp_p"), **rp}
         if chart:
             e["chart"] = chart
 

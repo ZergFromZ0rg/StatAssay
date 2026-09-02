@@ -108,6 +108,36 @@ def scatter_series(x: pd.Series, y: pd.Series, cap: int = SCATTER_CAP) -> dict |
     }
 
 
+RESIDUAL_CAP = 200
+
+
+def residual_series(fitted, resid, cap: int = RESIDUAL_CAP) -> dict | None:
+    """Residuals against fitted values for a regression, subsampled to ``cap``.
+
+    A funnel shape flags heteroskedasticity; a curve flags a missing non-linear
+    term — the two assumptions the model finding tests for.
+    """
+    f = np.asarray(fitted, float)
+    r = np.asarray(resid, float)
+    mask = np.isfinite(f) & np.isfinite(r)
+    f, r = f[mask], r[mask]
+    n = int(f.size)
+    if n < 3:
+        return None
+    sampled = n > cap
+    if sampled:
+        idx = np.random.default_rng(_SEED).choice(n, size=cap, replace=False)
+        idx.sort()
+        f, r = f[idx], r[idx]
+    return {
+        "points": [[float(a), float(b)] for a, b in zip(f, r)],
+        "n": n,
+        "sampled": bool(sampled),
+        "fitted_lim": _robust_limits(f),
+        "resid_lim": _robust_limits(r),
+    }
+
+
 def box_stats(values: np.ndarray) -> dict | None:
     """Tukey five-number summary plus fenced outliers for one group."""
     v = np.asarray(values, float)

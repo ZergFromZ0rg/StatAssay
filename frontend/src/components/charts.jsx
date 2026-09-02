@@ -130,6 +130,64 @@ export function Scatter({ chart, width = 300, height = 200 }) {
 }
 
 /* --------------------------------------------------------------------- */
+/* Residuals vs fitted values                                           */
+/* --------------------------------------------------------------------- */
+export function ResidualPlot({ chart, width = 300, height = 190 }) {
+  if (!chart?.points?.length) return null;
+  const { points, n, sampled, bp_p: bpP } = chart;
+  const w = width;
+  const h = height;
+  const clipId = `rclip-${chart.outcome}`.replace(/[^a-zA-Z0-9-]/g, "_");
+  const m = { l: 40, r: 8, t: 8, b: 26 };
+  const iw = w - m.l - m.r;
+  const ih = h - m.t - m.b;
+
+  const span = (arr, sym = false) => {
+    let [lo, hi] = arr;
+    if (sym) { const a = Math.max(Math.abs(lo), Math.abs(hi)); lo = -a; hi = a; }
+    if (lo === hi) { lo -= 1; hi += 1; }
+    return [lo, hi];
+  };
+  const [xlo, xhi] = span(chart.fitted_lim ?? [Math.min(...points.map((p) => p[0])), Math.max(...points.map((p) => p[0]))]);
+  const [ylo, yhi] = span(chart.resid_lim ?? [Math.min(...points.map((p) => p[1])), Math.max(...points.map((p) => p[1]))], true);
+  const sx = (v) => m.l + ((v - xlo) / (xhi - xlo)) * iw;
+  const sy = (v) => m.t + ih - ((v - ylo) / (yhi - ylo)) * ih;
+  const clipped = points.filter((p) => p[0] < xlo || p[0] > xhi || p[1] < ylo || p[1] > yhi).length;
+
+  return (
+    <figure style={{ margin: "6px 0 0" }}>
+      <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} role="img"
+           aria-label={`Residuals against fitted values for the model of ${chart.outcome}`} style={{ display: "block" }}>
+        <defs>
+          <clipPath id={clipId}><rect x={m.l} y={m.t} width={iw} height={ih} /></clipPath>
+        </defs>
+        <line x1={m.l} y1={m.t} x2={m.l} y2={m.t + ih} stroke={AXIS} strokeWidth="1" />
+        <line x1={m.l} y1={m.t + ih} x2={m.l + iw} y2={m.t + ih} stroke={AXIS} strokeWidth="1" />
+        <line x1={m.l} y1={sy(0)} x2={m.l + iw} y2={sy(0)} stroke={ACCENT} strokeWidth="1" strokeDasharray="3 2" />
+        <g clipPath={`url(#${clipId})`}>
+          {points.map((p, i) => (
+            <circle key={i} cx={sx(p[0])} cy={sy(p[1])} r={2.2} fill={INK} opacity={0.5} />
+          ))}
+        </g>
+        <text x={m.l} y={m.t + ih + 10} fontSize="8" fill={MUTED}>{niceNum(xlo)}</text>
+        <text x={m.l + iw} y={m.t + ih + 10} fontSize="8" fill={MUTED} textAnchor="end">{niceNum(xhi)}</text>
+        <text x={m.l - 3} y={m.t + ih} fontSize="8" fill={MUTED} textAnchor="end">{niceNum(ylo)}</text>
+        <text x={m.l - 3} y={m.t + 6} fontSize="8" fill={MUTED} textAnchor="end">{niceNum(yhi)}</text>
+        <text x={m.l + iw / 2} y={h - 3} fontSize="9" fill={INK} textAnchor="middle">fitted value</text>
+        <text x={9} y={m.t + ih / 2} fontSize="9" fill={INK} textAnchor="middle"
+              transform={`rotate(-90 9 ${m.t + ih / 2})`}>residual</text>
+      </svg>
+      <figcaption style={{ fontSize: 9, color: MUTED, marginTop: 1 }}>
+        {sampled ? `${points.length} of ${n} rows shown` : `${n} rows`}
+        {" · dashed line = zero"}
+        {typeof bpP === "number" ? ` · Breusch–Pagan p = ${bpP < 1e-3 ? bpP.toExponential(1) : bpP.toFixed(3)}` : ""}
+        {clipped ? ` · ${clipped} outside range` : ""}
+      </figcaption>
+    </figure>
+  );
+}
+
+/* --------------------------------------------------------------------- */
 /* Horizontal box plot, one row per group                               */
 /* --------------------------------------------------------------------- */
 export function BoxPlot({ chart, width = 300, rowH = 26 }) {
@@ -343,5 +401,6 @@ export function FindingChart({ chart }) {
   if (chart.type === "scatter") return <Scatter chart={chart} />;
   if (chart.type === "box") return <BoxPlot chart={chart} />;
   if (chart.type === "contingency") return <ContingencyBars chart={chart} />;
+  if (chart.type === "residual") return <ResidualPlot chart={chart} />;
   return null;
 }

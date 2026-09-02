@@ -10,6 +10,8 @@ from scipy import stats
 from statsmodels.stats.diagnostic import het_breuschpagan
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
+from . import charts
+
 MIN_N = 10
 MIN_GROUP_N = 3
 MAX_GROUP_LEVELS = 20
@@ -365,7 +367,9 @@ def regressions(df: pd.DataFrame, numeric_cols: list[str], categorical_cols: lis
                    "f": float(fit.fvalue), "f_p": float(fit.f_pvalue),
                    "bp_p": bp_p, "shapiro_resid_p": shap_p, "cooks_max": cooks_max,
                    "vif_max": vif_max, "n_predictors": int(p_eff),
-                   "n_drop_frac": float(n_drop_frac), "note": note},
+                   "n_drop_frac": float(n_drop_frac), "note": note,
+                   "resid_plot": charts.residual_series(fit.fittedvalues.to_numpy(),
+                                                        resid.to_numpy())},
         ))
 
         y_std = y.std(ddof=1)
