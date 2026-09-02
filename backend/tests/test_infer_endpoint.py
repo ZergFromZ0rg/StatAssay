@@ -62,6 +62,25 @@ def test_infer_attaches_charts():
     assert ab["value"] > 0.99  # a and b are perfectly collinear
 
 
+def test_markdown_export_includes_chart_sections():
+    md = _post(SAMPLE).json()["report_markdown"]
+    assert "## Column distributions" in md
+    assert "## Correlation matrix" in md
+    # the sparkline block and the matrix table are both present
+    assert any(ch in md for ch in "▁▂▃▄▅▆▇█")
+    assert "| r | a | b |" in md
+
+
+def test_markdown_export_embeds_contingency_table():
+    rows = ["cat,region"]
+    for i in range(120):
+        cat = "A" if i % 2 else "B"
+        region = ("north" if i % 2 else "south") if i % 10 else ("south" if i % 2 else "north")
+        rows.append(f"{cat},{region}")
+    md = _post("\n".join(rows).encode()).json()["report_markdown"]
+    assert "| cat \\ region |" in md
+
+
 def test_infer_attaches_contingency_chart():
     rows = ["cat,region"]
     for i in range(120):

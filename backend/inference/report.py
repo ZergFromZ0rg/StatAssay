@@ -73,6 +73,82 @@ def _all_results(sweep: dict) -> dict:
     }
 
 
+def _num(v, digits: int = 2) -> str:
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return "—"
+    if math.isnan(f) or math.isinf(f):
+        return "—"
+    return f"{f:.{digits}f}"
+
+
+def _md_table(header: list[str], rows: list[list]) -> list[str]:
+    out = ["| " + " | ".join(str(h) for h in header) + " |",
+           "| " + " | ".join("---" for _ in header) + " |"]
+    for r in rows:
+        out.append("| " + " | ".join(str(c) for c in r) + " |")
+    return out
+
+
+def _finding_chart_md(chart: dict) -> list[str]:
+    """A compact table rendering of a finding's chart, for the Markdown export."""
+    if not chart:
+        return []
+    if chart["type"] == "contingency":
+        rows = chart["rows"]
+        cols = chart["cols"]
+        body = [[rows[i]] + [str(chart["counts"][i][j]) for j in range(len(cols))] + [str(chart["row_totals"][i])]
+                for i in range(len(rows))]
+        table = _md_table([f"{chart['row_var']} \\ {chart['col_var']}"] + list(cols) + ["total"], body)
+        return ["", *table, ""]
+    if chart["type"] == "box":
+        body = [[g["level"], g["n"], _num(g["median"]), f"{_num(g['q1'])} – {_num(g['q3'])}"]
+                for g in chart["groups"]]
+        return ["", *_md_table([chart["cat"], "n", f"median {chart['num']}", "IQR"], body), ""]
+    return []
+
+
+def _distributions_md(report: dict) -> list[str]:
+    cols = [c for c in report["profile"]["columns"]
+            if c["type"] == "numeric" and (c.get("stats") or {}).get("histogram")]
+    if not cols:
+        return []
+    width = max(len(c["name"]) for c in cols)
+    lines = ["## Column distributions", "",
+             "Each bar is an equal-width histogram over the column's Tukey-fenced range.", "", "```"]
+    for c in cols:
+        h = c["stats"]["histogram"]
+        rng = f"[{_num(h['bin_edges'][0])} … {_num(h['bin_edges'][-1])}]"
+        beyond = (h.get("n_below", 0) or 0) + (h.get("n_above", 0) or 0)
+        tail = f"  (+{beyond} beyond range)" if beyond else ""
+        lines.append(f"{c['name']:<{width}}  {_charts.sparkline(h['counts'])}  {rng}{tail}")
+    lines += ["```", ""]
+    return lines
+
+
+def _corr_matrix_md(report: dict) -> list[str]:
+    matrix = report["all_results"].get("correlation_matrix")
+    if not matrix or len(matrix["columns"]) < 2:
+        return []
+    cols = matrix["columns"]
+    grid = {(c["i"], c["j"]): c["value"] for c in matrix["cells"]}
+
+    def cell(i, j):
+        v = grid.get((i, j), grid.get((j, i)))
+        return "" if v is None else _num(v)
+
+    body = [[cols[i]] + [cell(i, j) for j in range(len(cols))] for i in range(len(cols))]
+    lines = ["## Correlation matrix", "",
+             "Pearson / Spearman r between the numeric columns; blank where the pair was not tested.", ""]
+    lines += _md_table(["r"] + list(cols), body)
+    if matrix.get("truncated"):
+        lines.append("")
+        lines.append(f"_Showing the first {len(cols)} numeric columns._")
+    lines.append("")
+    return lines
+
+
 def _markdown(report: dict) -> str:
     m = report["meta"]
     dq = report["data_quality"]
@@ -100,6 +176,7 @@ def _markdown(report: dict) -> str:
                      f"({f['effect_magnitude']})  ·  robustness: {f['robustness']}")
         for c in f["caveats"]:
             lines.append(f"  - {c}")
+        lines += _finding_chart_md(f.get("chart"))
         lines.append("")
     if report["needs_review"]:
         lines += ["## Needs manual review", "",
@@ -111,6 +188,8 @@ def _markdown(report: dict) -> str:
     if sens["applicable"]:
         lines += ["## Imputation sensitivity", "",
                   f"{sens['changed_count']} finding(s) change when missing values are imputed rather than dropped.", ""]
+    lines += _distributions_md(report)
+    lines += _corr_matrix_md(report)
     st = report["sweep"]
     lines += ["## Tests run", "",
               f"- correlations: {st['n_tests']['correlations']}",

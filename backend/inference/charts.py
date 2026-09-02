@@ -48,6 +48,20 @@ def histogram(series: pd.Series, max_bins: int = HIST_MAX_BINS) -> dict | None:
     }
 
 
+_SPARK = "▁▂▃▄▅▆▇█"
+
+
+def sparkline(counts: list[int]) -> str:
+    """A one-line unicode block rendering of bin counts, for the Markdown export."""
+    if not counts:
+        return ""
+    hi = max(counts)
+    if hi <= 0:
+        return _SPARK[0] * len(counts)
+    last = len(_SPARK) - 1
+    return "".join(_SPARK[min(last, round(c / hi * last))] for c in counts)
+
+
 def _trend(x: np.ndarray, y: np.ndarray) -> dict | None:
     """Least-squares line endpoints across the observed x-range."""
     if x.size < 3 or np.ptp(x) == 0:

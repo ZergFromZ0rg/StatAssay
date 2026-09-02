@@ -20,6 +20,14 @@ def test_histogram_bins_over_robust_range_when_outlier_present():
     assert h["bin_edges"][-1] < 1000  # the outlier did not stretch the axis
 
 
+def test_sparkline_maps_counts_to_blocks():
+    s = charts.sparkline([0, 5, 10])
+    assert s[0] == "▁" and s[-1] == "█" and len(s) == 3
+    assert charts.sparkline([]) == ""
+    assert charts.sparkline([0, 0, 0]) == "▁▁▁"
+    assert len(charts.sparkline([1, 2, 3, 4, 5])) == 5
+
+
 def test_histogram_too_small_returns_none():
     assert charts.histogram(pd.Series([1.0, 2.0, 3.0])) is None
 
