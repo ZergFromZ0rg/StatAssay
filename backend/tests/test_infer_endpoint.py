@@ -44,6 +44,19 @@ def test_infer_returns_report_shape():
     assert body["report_markdown"].startswith("# StatGuard report")
 
 
+def test_infer_attaches_charts():
+    body = _post(SAMPLE).json()
+    numeric = [c for c in body["profile"]["columns"] if c["type"] == "numeric"]
+    assert numeric and all(c["stats"]["histogram"]["counts"] for c in numeric)
+
+    corr = [f for f in body["findings"] if f["family"] == "correlation"]
+    assert corr, "expected a correlation finding for a perfectly linear column pair"
+    chart = corr[0]["chart"]
+    assert chart["type"] == "scatter"
+    assert len(chart["points"]) == chart["n"]
+    assert chart["trend"] is not None
+
+
 def test_infer_rejects_garbage():
     r = _post(b"\x00\x01\x02 not a csv at all \xff", "junk.bin")
     assert r.status_code == 400

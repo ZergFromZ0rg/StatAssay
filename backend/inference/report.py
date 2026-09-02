@@ -6,6 +6,7 @@ import math
 import numpy as np
 import pandas as pd
 
+from . import charts as _charts
 from . import findings as _f
 from .preprocess import build_frames, select_modeling_columns, split_types
 from .profiling import profile_columns, quality_summary, scan_quality
@@ -123,6 +124,31 @@ def _markdown(report: dict) -> str:
     return "\n".join(lines)
 
 
+def _attach_charts(entries: list[dict], cc_df: pd.DataFrame) -> None:
+    """Give each headline finding a plot-ready series drawn from the complete-case frame."""
+    for e in entries:
+        chart = None
+        if e["family"] == "correlation":
+            a, b = e["vars"]
+            if a in cc_df.columns and b in cc_df.columns:
+                series = _charts.scatter_series(cc_df[a], cc_df[b])
+                if series:
+                    # A least-squares line only matches a Pearson finding; for a
+                    # rank-based (Spearman) one it would misrepresent the statistic.
+                    if e.get("kind") != "pearson":
+                        series["trend"] = None
+                    chart = {"type": "scatter", "x": a, "y": b, "kind": e.get("kind"), **series}
+        elif e["family"] == "group_difference":
+            num, cat = e["vars"]
+            levels = [g["level"] for g in e.get("stats", {}).get("groups", [])]
+            boxes = _charts.group_box_series(cc_df, num, cat, levels)
+            if boxes:
+                chart = {"type": "box", "num": num, "cat": cat, "groups": boxes,
+                         "higher_group": e.get("stats", {}).get("higher_group")}
+        if chart:
+            e["chart"] = chart
+
+
 def run_inference(df: pd.DataFrame, raw_df: pd.DataFrame, filename: str) -> dict:
     n_rows, n_cols = int(df.shape[0]), int(df.shape[1])
 
@@ -142,6 +168,8 @@ def run_inference(df: pd.DataFrame, raw_df: pd.DataFrame, filename: str) -> dict
         _f.apply_fdr(imputed)
 
     finding_list, needs_review = _f.build_findings(primary, imputed, n_rows)
+    _attach_charts(finding_list, cc_df)
+    _attach_charts(needs_review, cc_df)
     sensitivity = _f.imputation_sensitivity(primary, imputed)
 
     type_counts = {"numeric": 0, "categorical": 0, "datetime": 0, "excluded": 0}

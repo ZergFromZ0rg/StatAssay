@@ -1,5 +1,6 @@
 import { card, sectionTitle, badge } from "./uiStyles";
 import { fmt, FAMILY_LABEL, ROBUSTNESS_LABEL } from "./reportHelpers";
+import { FindingChart } from "./charts";
 
 function Caveats({ items }) {
   if (!items?.length) return null;
@@ -39,6 +40,11 @@ function FindingCard({ finding, tone }) {
           </span>
         )}
       </div>
+      {finding.chart && (
+        <div style={{ marginTop: 4 }}>
+          <FindingChart chart={finding.chart} />
+        </div>
+      )}
       <Caveats items={finding.caveats} />
     </div>
   );

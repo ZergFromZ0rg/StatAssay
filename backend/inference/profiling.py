@@ -6,6 +6,8 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from . import charts
+
 NUMERIC_RE = re.compile(r"^[+-]?(\d{1,3}(,\d{3})+|\d+)(\.\d+)?([eE][+-]?\d+)?$")
 
 # Column-name tokens that mark an identifier (ported from the old frontend heuristic).
@@ -73,6 +75,7 @@ def _numeric_stats(series: pd.Series) -> dict:
         "kurtosis": float(s.kurt()) if len(s) > 3 else 0.0,
         "n_outliers_3iqr": out3,
         "n_outliers_5iqr": out5,
+        "histogram": charts.histogram(s),
     }
 
 

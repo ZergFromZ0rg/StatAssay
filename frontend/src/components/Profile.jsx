@@ -1,5 +1,6 @@
 import { card, sectionTitle, thUtil, tdUtil } from "./uiStyles";
 import { fmt, pct } from "./reportHelpers";
+import { Histogram } from "./charts";
 
 const TYPE_LABEL = {
   numeric: "Numeric",
@@ -11,6 +12,7 @@ const TYPE_LABEL = {
 export default function Profile({ profile }) {
   const columns = profile?.columns ?? [];
   const counts = profile?.type_counts ?? {};
+  const distributions = columns.filter((c) => c.stats?.histogram?.counts?.length);
 
   return (
     <div style={card}>
@@ -55,6 +57,19 @@ export default function Profile({ profile }) {
         </table>
       </div>
       <div style={{ fontSize: 9, color: "var(--text-muted)", marginTop: 4 }}>* parsed from text</div>
+
+      {distributions.length > 0 && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--text-muted)", marginBottom: 6 }}>
+            Distributions
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
+            {distributions.map((col) => (
+              <Histogram key={col.name} hist={col.stats.histogram} label={col.name} />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
