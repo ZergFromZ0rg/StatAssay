@@ -38,6 +38,18 @@ def test_regression_finding_carries_residual_and_influence_plots(linear_df, raw_
     assert "resid_plot" not in rm["extra"] and "influence_plot" not in rm["extra"]
 
 
+def test_coefficient_finding_carries_an_added_variable_plot(linear_df, raw_view):
+    rep = run_inference(linear_df, raw_view(linear_df), "linear.csv")
+    entries = rep["findings"] + rep["needs_review"]
+    coef = next(e for e in entries
+                if e["family"] == "regression_coefficient" and e["vars"] == ["y", "x1"])
+    avp = next(c for c in coef["charts"] if c["type"] == "added_variable")
+    assert avp["term"] == "x1" and avp["outcome"] == "y"
+    assert avp["slope"] == pytest.approx(2.0, abs=0.3)  # y = 2*x1 + noise
+    rc = [r for r in rep["all_results"]["regression_coefficients"] if r["vars"] == ["y", "x1"]][0]
+    assert "avp_plot" not in rc["extra"]
+
+
 def test_recovers_group_difference(group_df, raw_view):
     rep = run_inference(group_df, raw_view(group_df), "group.csv")
     gd = [r for r in rep["all_results"]["group_differences"] if r["vars"] == ["score", "group"]][0]

@@ -55,10 +55,10 @@ def _all_results(sweep: dict) -> dict:
                     "effect_name": r["effect_name"], "effect_value": r["effect_value"],
                     "effect_magnitude": r["effect_magnitude"], "direction": r["direction"],
                     "assumptions": r["assumptions"], "nonparametric_agrees": r["nonparametric_agrees"],
-                    # resid_plot / influence_plot are chart payloads for the headline
-                    # findings only — keep the full results table lean.
+                    # resid_plot / influence_plot / avp_plot are chart payloads for the
+                    # headline findings only — keep the full results table lean.
                     "extra": {k: v for k, v in r["extra"].items()
-                              if k not in ("resid_plot", "influence_plot")},
+                              if k not in ("resid_plot", "influence_plot", "avp_plot")},
                 }
                 for r in rows
             ),
@@ -117,6 +117,9 @@ def _one_chart_md(chart: dict) -> list[str]:
     if chart["type"] == "influence" and chart.get("n_above"):
         return [f"  - {chart['n_above']} of {chart['n']} rows exceed the 4/n Cook's-distance "
                 f"threshold (max D = {_num(chart['max'], 3)})."]
+    if chart["type"] == "added_variable" and chart.get("slope") is not None:
+        return [f"  - Partial-regression slope for {chart['term']} "
+                f"(other predictors held constant): {_num(chart['slope'], 3)}."]
     return []
 
 
@@ -251,6 +254,11 @@ def _attach_charts(entries: list[dict], cc_df: pd.DataFrame) -> None:
             inf = stats.pop("influence_plot", None)
             if inf:
                 charts.append({"type": "influence", "outcome": e["vars"][0], **inf})
+        elif e["family"] == "regression_coefficient":
+            avp = stats.pop("avp_plot", None)
+            if avp:
+                outcome, term = e["vars"]
+                charts.append({"type": "added_variable", "outcome": outcome, "term": term, **avp})
         if charts:
             e["charts"] = charts
 

@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from inference import charts
 
@@ -80,6 +81,23 @@ def test_residual_series_drops_non_finite():
 
 def test_residual_series_too_small():
     assert charts.residual_series([1.0, 2.0], [0.1, 0.2]) is None
+
+
+def test_added_variable_series_slope_matches_coefficient(rng):
+    n = 300
+    x1 = rng.normal(0, 1, n)
+    x2 = rng.normal(0, 1, n)
+    y = 2.0 * x1 - 1.0 * x2 + rng.normal(0, 0.4, n)
+    X = pd.DataFrame({"x1": x1, "x2": x2})
+    s = charts.added_variable_series(y, X, "x1")
+    assert s["n"] == n
+    assert s["slope"] == pytest.approx(2.0, abs=0.15)
+    # residualised x is centred at zero
+    assert abs(np.mean([p[0] for p in s["points"]])) < 0.2
+
+
+def test_added_variable_series_unknown_term():
+    assert charts.added_variable_series([1.0, 2, 3], pd.DataFrame({"a": [1.0, 2, 3]}), "z") is None
 
 
 def test_box_stats_quartile_order():

@@ -384,6 +384,11 @@ def regressions(df: pd.DataFrame, numeric_cols: list[str], categorical_cols: lis
             std_beta = float(est * x_std / y_std) if y_std and np.isfinite(x_std) else float("nan")
             ci = fit.conf_int().loc[term]
             unstable = bool(np.isfinite(std_beta) and abs(std_beta) > 1.5)
+            # A coefficient can only become a finding when q < 0.05, and q >= raw p,
+            # so skip the partial-regression plot for clearly-null terms.
+            avp = None
+            if np.isfinite(fit.pvalues[term]) and fit.pvalues[term] < 0.05 and term in X.columns:
+                avp = charts.added_variable_series(y.to_numpy(float), X, term)
             coefs.append(_result(
                 family="regression_coefficient", kind="coef", vars=[outcome, term], n=n,
                 statistic=float(fit.tvalues[term]), p_raw=float(fit.pvalues[term]),
@@ -401,7 +406,7 @@ def regressions(df: pd.DataFrame, numeric_cols: list[str], categorical_cols: lis
                 ],
                 extra={"estimate": est, "std_error": float(fit.bse[term]),
                        "ci_low": float(ci[0]), "ci_high": float(ci[1]), "outcome": outcome,
-                       "model_adj_r2": adj_r2, "model_vif_max": vif_max},
+                       "model_adj_r2": adj_r2, "model_vif_max": vif_max, "avp_plot": avp},
             ))
     return models, coefs
 

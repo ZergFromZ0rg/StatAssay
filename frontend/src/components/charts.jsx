@@ -188,6 +188,71 @@ export function ResidualPlot({ chart, width = 300, height = 190 }) {
 }
 
 /* --------------------------------------------------------------------- */
+/* Added-variable (partial regression) plot                             */
+/* --------------------------------------------------------------------- */
+export function AddedVariablePlot({ chart, width = 300, height = 200 }) {
+  if (!chart?.points?.length) return null;
+  const { points, trend, term, outcome, n, sampled } = chart;
+  const w = width;
+  const h = height;
+  const clipId = `avp-${outcome}-${term}`.replace(/[^a-zA-Z0-9-]/g, "_");
+  const m = { l: 40, r: 8, t: 8, b: 28 };
+  const iw = w - m.l - m.r;
+  const ih = h - m.t - m.b;
+
+  const span = (arr) => {
+    let [lo, hi] = arr;
+    if (lo === hi) { lo -= 1; hi += 1; }
+    return [lo, hi];
+  };
+  const fb = (v) => [Math.min(...v), Math.max(...v)];
+  const [xlo, xhi] = span(chart.x_lim ?? fb(points.map((p) => p[0])));
+  const [ylo, yhi] = span(chart.y_lim ?? fb(points.map((p) => p[1])));
+  const sx = (v) => m.l + ((v - xlo) / (xhi - xlo)) * iw;
+  const sy = (v) => m.t + ih - ((v - ylo) / (yhi - ylo)) * ih;
+  const clipped = points.filter((p) => p[0] < xlo || p[0] > xhi || p[1] < ylo || p[1] > yhi).length;
+
+  return (
+    <figure style={{ margin: "6px 0 0" }}>
+      <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} role="img"
+           aria-label={`Added-variable plot for ${term} in the model of ${outcome}`} style={{ display: "block" }}>
+        <defs><clipPath id={clipId}><rect x={m.l} y={m.t} width={iw} height={ih} /></clipPath></defs>
+        <line x1={m.l} y1={m.t} x2={m.l} y2={m.t + ih} stroke={AXIS} strokeWidth="1" />
+        <line x1={m.l} y1={m.t + ih} x2={m.l + iw} y2={m.t + ih} stroke={AXIS} strokeWidth="1" />
+        <g clipPath={`url(#${clipId})`}>
+          {xlo < 0 && xhi > 0 && (
+            <line x1={sx(0)} y1={m.t} x2={sx(0)} y2={m.t + ih} stroke={MUTED} strokeWidth="0.6" strokeDasharray="2 2" />
+          )}
+          {ylo < 0 && yhi > 0 && (
+            <line x1={m.l} y1={sy(0)} x2={m.l + iw} y2={sy(0)} stroke={MUTED} strokeWidth="0.6" strokeDasharray="2 2" />
+          )}
+          {points.map((p, i) => (
+            <circle key={i} cx={sx(p[0])} cy={sy(p[1])} r={2.2} fill={INK} opacity={0.5} />
+          ))}
+          {trend && (
+            <line x1={sx(trend.x0)} y1={sy(trend.y0)} x2={sx(trend.x1)} y2={sy(trend.y1)}
+                  stroke={ACCENT} strokeWidth="1.5" />
+          )}
+        </g>
+        <text x={m.l} y={m.t + ih + 10} fontSize="8" fill={MUTED}>{niceNum(xlo)}</text>
+        <text x={m.l + iw} y={m.t + ih + 10} fontSize="8" fill={MUTED} textAnchor="end">{niceNum(xhi)}</text>
+        <text x={m.l - 3} y={m.t + ih} fontSize="8" fill={MUTED} textAnchor="end">{niceNum(ylo)}</text>
+        <text x={m.l - 3} y={m.t + 6} fontSize="8" fill={MUTED} textAnchor="end">{niceNum(yhi)}</text>
+        <text x={m.l + iw / 2} y={h - 15} fontSize="9" fill={INK} textAnchor="middle">{term} | others</text>
+        <text x={m.l + iw / 2} y={h - 4} fontSize="8" fill={MUTED} textAnchor="middle">(both axes adjusted for the other predictors)</text>
+        <text x={9} y={m.t + ih / 2} fontSize="9" fill={INK} textAnchor="middle"
+              transform={`rotate(-90 9 ${m.t + ih / 2})`}>{outcome} | others</text>
+      </svg>
+      <figcaption style={{ fontSize: 9, color: MUTED, marginTop: 1 }}>
+        {sampled ? `${points.length} of ${n} rows shown` : `${n} rows`}
+        {typeof chart.slope === "number" ? ` · slope = coefficient = ${niceNum(chart.slope)}` : ""}
+        {clipped ? ` · ${clipped} outside range` : ""}
+      </figcaption>
+    </figure>
+  );
+}
+
+/* --------------------------------------------------------------------- */
 /* Cook's-distance stem plot (regression influence)                     */
 /* --------------------------------------------------------------------- */
 export function InfluencePlot({ chart, width = 300, height = 150 }) {
@@ -490,5 +555,6 @@ export function FindingChart({ chart }) {
   if (chart.type === "contingency") return <ContingencyBars chart={chart} />;
   if (chart.type === "residual") return <ResidualPlot chart={chart} />;
   if (chart.type === "influence") return <InfluencePlot chart={chart} />;
+  if (chart.type === "added_variable") return <AddedVariablePlot chart={chart} />;
   return null;
 }

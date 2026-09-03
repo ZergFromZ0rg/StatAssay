@@ -71,6 +71,7 @@ def _trend(x: np.ndarray, y: np.ndarray) -> dict | None:
     return {
         "x0": x0, "y0": float(slope * x0 + intercept),
         "x1": x1, "y1": float(slope * x1 + intercept),
+        "slope": float(slope),
     }
 
 
@@ -149,6 +150,60 @@ def residual_series(fitted, resid, cap: int = RESIDUAL_CAP) -> dict | None:
         "sampled": bool(sampled),
         "fitted_lim": _robust_limits(f),
         "resid_lim": _robust_limits(r),
+    }
+
+
+AVP_CAP = 150
+
+
+def _residualize(target: np.ndarray, others: np.ndarray) -> np.ndarray:
+    """Residuals of ``target`` after an OLS on ``others`` (intercept added)."""
+    design = np.column_stack([np.ones(len(target)), others]) if others.size else np.ones((len(target), 1))
+    coef, *_ = np.linalg.lstsq(design, target, rcond=None)
+    return target - design @ coef
+
+
+def added_variable_series(y, X_df, term: str, cap: int = AVP_CAP) -> dict | None:
+    """Partial-regression (added-variable) plot data for one predictor.
+
+    Scatters ``y`` residualised against the other predictors versus ``term``
+    residualised the same way; the fitted slope equals the model's coefficient
+    for ``term``, so the plot shows that term's unique contribution.
+    """
+    if term not in X_df.columns:
+        return None
+    other_cols = [c for c in X_df.columns if c != term]
+    y = np.asarray(y, float)
+    xk = X_df[term].to_numpy(float)
+    others = X_df[other_cols].to_numpy(float) if other_cols else np.empty((len(y), 0))
+
+    mask = np.isfinite(y) & np.isfinite(xk)
+    if others.shape[1]:
+        mask &= np.isfinite(others).all(axis=1)
+    y, xk, others = y[mask], xk[mask], others[mask]
+    n = int(y.size)
+    if n < 3:
+        return None
+
+    ey = _residualize(y, others)
+    ex = _residualize(xk, others)
+    if np.ptp(ex) == 0:
+        return None
+    trend = _trend(ex, ey)
+    x_lim, y_lim = _robust_limits(ex), _robust_limits(ey)
+    sampled = n > cap
+    if sampled:
+        idx = np.random.default_rng(_SEED).choice(n, size=cap, replace=False)
+        idx.sort()
+        ex, ey = ex[idx], ey[idx]
+    return {
+        "points": [[float(a), float(b)] for a, b in zip(ex, ey)],
+        "n": n,
+        "sampled": bool(sampled),
+        "trend": trend,
+        "slope": float(trend["slope"]) if trend else None,
+        "x_lim": x_lim,
+        "y_lim": y_lim,
     }
 
 
