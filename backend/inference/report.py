@@ -8,6 +8,7 @@ import pandas as pd
 
 from . import charts as _charts
 from . import findings as _f
+from . import profiling as _profiling
 from .preprocess import build_frames, select_modeling_columns, split_types
 from .profiling import profile_columns, quality_summary, scan_quality
 from .sweep import run_sweep
@@ -168,6 +169,25 @@ def _corr_matrix_md(report: dict) -> list[str]:
     return lines
 
 
+def _location_phrase(detail: dict | None, id_col: str | None) -> str:
+    """Render an issue's row locations as a short 'at row N / id X' phrase."""
+    if not detail or not detail.get("locations"):
+        return ""
+    locs = detail["locations"]
+    has_value = any("value" in loc for loc in locs)
+    ref = (lambda loc: f"{id_col} {loc['id']}"
+           if id_col and loc.get("id") is not None else f"row {loc['row']}")
+    more = f" (+{detail['location_more']} more)" if detail.get("location_more") else ""
+
+    if has_value:
+        body = ", ".join(f"{ref(loc)}: {loc['value']:g}" if loc.get("value") is not None else ref(loc)
+                         for loc in locs)
+        return "at " + body + more
+    if id_col and all(loc.get("id") is not None for loc in locs):
+        return f"{id_col}: " + ", ".join(str(loc["id"]) for loc in locs) + more
+    return "rows " + ", ".join(str(loc["row"]) for loc in locs) + more
+
+
 def _markdown(report: dict) -> str:
     m = report["meta"]
     dq = report["data_quality"]
@@ -183,9 +203,13 @@ def _markdown(report: dict) -> str:
     ]
     if not dq["issues"]:
         lines.append("No data-quality issues detected.")
+    id_col = dq.get("row_id_column")
     for i in dq["issues"]:
         loc = f" [{i['column']}]" if i.get("column") else ""
         lines.append(f"- **{i['severity'].upper()}**{loc} {i['message']}")
+        where = _location_phrase(i.get("detail"), id_col)
+        if where:
+            lines.append(f"  - {where}")
     lines += ["", "## Key findings", ""]
     if not report["findings"]:
         lines.append("No findings cleared the significance + effect-size bar.")
@@ -313,7 +337,8 @@ def run_inference(df: pd.DataFrame, raw_df: pd.DataFrame, filename: str) -> dict
             ],
             "type_counts": type_counts,
         },
-        "data_quality": {"score": score, "summary": quality_summary(issues), "issues": issues},
+        "data_quality": {"score": score, "summary": quality_summary(issues), "issues": issues,
+                         "row_id_column": _profiling.detect_id_column(profiles)},
         "sweep": {
             "n_tests": _f.count_tests(primary),
             "column_cap": 40,

@@ -1,11 +1,37 @@
 import { card, sectionTitle, severityStyle } from "./uiStyles";
+import { fmt } from "./reportHelpers";
 import { DistributionBox } from "./charts";
 
 const SEVERITY_ORDER = ["high", "medium", "low"];
 const SHAPE_KINDS = new Set(["extreme_values", "outliers", "skew", "heavy_tails"]);
 
+function LocationList({ detail, idColumn }) {
+  const locs = detail?.locations;
+  if (!locs?.length) return null;
+  const num = (v) => (Number.isInteger(v) ? String(v) : fmt(v, 3));
+  const withValue = locs.some((l) => l.value !== undefined && l.value !== null);
+  const ref = (l) => (idColumn && l.id != null ? `${idColumn} ${l.id}` : `row ${l.row}`);
+  const more = detail.location_more ? ` (+${detail.location_more} more)` : "";
+
+  let text;
+  if (withValue) {
+    text = "at " + locs.map((l) => (l.value != null ? `${ref(l)}: ${num(l.value)}` : ref(l))).join(", ");
+  } else if (idColumn && locs.every((l) => l.id != null)) {
+    text = `${idColumn}: ` + locs.map((l) => l.id).join(", ");
+  } else {
+    text = "rows " + locs.map((l) => l.row).join(", ");
+  }
+  return (
+    <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
+      {text}
+      {more}
+    </div>
+  );
+}
+
 export default function DataQuality({ quality, profile }) {
   const issues = quality?.issues ?? [];
+  const idColumn = quality?.row_id_column ?? null;
 
   const statsByName = new Map((profile?.columns ?? []).map((c) => [c.name, c.stats]));
   const flaggedCols = [...new Set(
@@ -50,6 +76,7 @@ export default function DataQuality({ quality, profile }) {
               >
                 {issue.column ? <strong>{issue.column}: </strong> : null}
                 {issue.message}
+                <LocationList detail={issue.detail} idColumn={idColumn} />
               </div>
             ))}
           </div>

@@ -60,9 +60,16 @@ def _numeric_stats(series: pd.Series) -> dict:
     q3 = float(s.quantile(0.75))
     iqr = q3 - q1
     out3 = out5 = 0
+    pos3: list[list] = []
+    pos5: list[list] = []
     if iqr > 0:
-        out3 = int(((s < q1 - 3 * iqr) | (s > q3 + 3 * iqr)).sum())
-        out5 = int(((s < q1 - 5 * iqr) | (s > q3 + 5 * iqr)).sum())
+        m3 = (s < q1 - 3 * iqr) | (s > q3 + 3 * iqr)
+        m5 = (s < q1 - 5 * iqr) | (s > q3 + 5 * iqr)
+        out3, out5 = int(m3.sum()), int(m5.sum())
+        # (0-based row position, value) for the flagged rows — scan_quality turns
+        # these into human row numbers (and id-column values when one exists).
+        pos3 = [[int(i), float(v)] for i, v in s[m3].items()][:25]
+        pos5 = [[int(i), float(v)] for i, v in s[m5].items()][:25]
     return {
         "min": float(s.min()),
         "max": float(s.max()),
@@ -75,6 +82,8 @@ def _numeric_stats(series: pd.Series) -> dict:
         "kurtosis": float(s.kurt()) if len(s) > 3 else 0.0,
         "n_outliers_3iqr": out3,
         "n_outliers_5iqr": out5,
+        "outlier_pos_3iqr": pos3,
+        "outlier_pos_5iqr": pos5,
         "histogram": charts.histogram(s),
         "box": charts.box_stats(s.to_numpy(float)),
     }
@@ -211,34 +220,71 @@ def _missingness_associate(df: pd.DataFrame, target: str, profiles: list[dict]):
     return best
 
 
+_LOCATION_CAP = 15
+
+
+def detect_id_column(profiles: list[dict]) -> str | None:
+    """Name of the column that identifies a row (excluded as id-like), if any."""
+    return next((p["name"] for p in profiles
+                 if (p["exclude_reason"] or "").startswith("id-like")), None)
+
+
+def _row_label_fn(df: pd.DataFrame, profiles: list[dict]):
+    """Return a function pos -> {"row": 1-based, "id": <id-column value>|None}.
+
+    ``row`` is the 1-based position in the data (row 1 = first data row). When the
+    file has an identifier column, its value at that row is included so a user can
+    find the record without counting lines.
+    """
+    id_col = detect_id_column(profiles)
+    id_vals = df[id_col].tolist() if id_col and id_col in df.columns else None
+
+    def label(pos: int) -> dict:
+        out = {"row": int(pos) + 1}
+        if id_vals is not None and 0 <= pos < len(id_vals):
+            v = id_vals[pos]
+            out["id"] = None if pd.isna(v) else str(v)
+        return out
+
+    return id_col, label
+
+
+def _locations(positions, label_fn) -> dict:
+    shown = [label_fn(p) for p in positions[:_LOCATION_CAP]]
+    return {"locations": shown, "location_count": len(positions),
+            "location_more": max(0, len(positions) - len(shown))}
+
+
 def scan_quality(df: pd.DataFrame, profiles: list[dict]) -> tuple[float, list[dict]]:
     issues: list[dict] = []
     n_rows = len(df)
     by_name = {p["name"]: p for p in profiles}
+    id_col, row_label = _row_label_fn(df, profiles)
 
     if n_rows < 10:
         _add(issues, "high", "sample_size", f"Only {n_rows} rows — almost every test is unreliable.")
     elif n_rows < 30:
         _add(issues, "high", "sample_size", f"Only {n_rows} rows — most tests are underpowered.")
 
-    rows_any_missing = int(df.isna().any(axis=1).sum())
-    if rows_any_missing:
-        frac = rows_any_missing / n_rows
+    missing_row_pos = [i for i, flag in enumerate(df.isna().any(axis=1).tolist()) if flag]
+    if missing_row_pos:
+        frac = len(missing_row_pos) / n_rows
         sev = "medium" if frac > 0.2 else "low"
         _add(issues, sev, "missing_rows",
-             f"{rows_any_missing} of {n_rows} rows ({frac:.0%}) have at least one missing value.")
+             f"{len(missing_row_pos)} of {n_rows} rows ({frac:.0%}) have at least one missing value.",
+             detail=_locations(missing_row_pos, row_label))
 
     n_numeric_modeling = sum(1 for p in profiles if p["type"] == "numeric")
 
     for p in profiles:
         col = p["name"]
         pm = p["pct_missing"]
-        if pm > 0.5:
-            _add(issues, "high", "missing_column", f"'{col}' is {pm:.0%} missing.", column=col)
-        elif pm > 0.2:
-            _add(issues, "medium", "missing_column", f"'{col}' is {pm:.0%} missing.", column=col)
-        elif pm > 0:
-            _add(issues, "low", "missing_column", f"'{col}' is {pm:.0%} missing.", column=col)
+        if pm > 0:
+            miss_pos = [i for i, flag in enumerate(df[col].isna().tolist()) if flag]
+            where = _locations(miss_pos, row_label) if col != id_col else None
+            sev = "high" if pm > 0.5 else "medium" if pm > 0.2 else "low"
+            _add(issues, sev, "missing_column", f"'{col}' is {pm:.0%} missing.",
+                 column=col, detail=where)
 
         if 0 < pm < 1 and p["type"] in ("numeric", "categorical"):
             assoc = _missingness_associate(df, col, profiles)
@@ -265,13 +311,24 @@ def scan_quality(df: pd.DataFrame, profiles: list[dict]) -> tuple[float, list[di
             _add(issues, "low", "coerced_type", f"'{col}' was stored as text and parsed as numbers.", column=col)
 
         s = p["stats"] or {}
+        pos5 = s.pop("outlier_pos_5iqr", []) or []
+        pos3 = s.pop("outlier_pos_3iqr", []) or []
+
+        def _outlier_detail(pos_pairs):
+            det = _locations([pos for pos, _ in pos_pairs], row_label)
+            values = {pos: val for pos, val in pos_pairs}
+            for loc in det["locations"]:
+                loc["value"] = values.get(loc["row"] - 1)
+            return det
+
         if s.get("n_outliers_5iqr", 0) > 0:
             _add(issues, "medium", "extreme_values",
                  f"'{col}' has {s['n_outliers_5iqr']} extreme value(s) beyond 5×IQR — likely to distort results.",
-                 column=col)
+                 column=col, detail=_outlier_detail(pos5))
         elif s.get("n_outliers_3iqr", 0) > 0:
             _add(issues, "low", "outliers",
-                 f"'{col}' has {s['n_outliers_3iqr']} outlier(s) beyond 3×IQR.", column=col)
+                 f"'{col}' has {s['n_outliers_3iqr']} outlier(s) beyond 3×IQR.",
+                 column=col, detail=_outlier_detail(pos3))
         if abs(s.get("skew", 0)) > 2:
             _add(issues, "medium", "skew", f"'{col}' is severely skewed (skew = {s['skew']:.2f}).", column=col)
         elif abs(s.get("skew", 0)) > 1:
