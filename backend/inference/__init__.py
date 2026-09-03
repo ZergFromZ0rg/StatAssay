@@ -3,8 +3,6 @@
 Public entry point: ``run_inference(df, raw_df, filename) -> dict``.
 """
 
-from .report import run_inference
+from .report import TOOL_VERSION, run_inference
 
-__all__ = ["run_inference"]
-
-TOOL_VERSION = "2.1.0"
+__all__ = ["run_inference", "TOOL_VERSION"]

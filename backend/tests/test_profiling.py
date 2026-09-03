@@ -62,6 +62,22 @@ def test_quality_issues_carry_row_locations(messy_df, raw_view):
     assert "outlier_pos_5iqr" not in vstats
 
 
+def test_outlier_row_numbers_survive_a_non_range_index(messy_df, raw_view):
+    # pandas gives the frame a label index when it infers a row-label column;
+    # outlier positions must still be resolved as 0-based row offsets, not labels.
+    shifted = messy_df.copy()
+    shifted.index = [f"r{i}" for i in range(100, 100 + len(shifted))]
+
+    profiles = profile_columns(shifted, raw_view(shifted))
+    _, issues = scan_quality(shifted, profiles)
+
+    extreme = next(i for i in issues if i["kind"] == "extreme_values")
+    loc = extreme["detail"]["locations"][0]
+    assert loc["row"] == 40
+    assert loc["value"] == 100000.0
+    assert loc["id"] == str(shifted["user_id"].iloc[39])
+
+
 def test_continuous_all_unique_column_is_kept(linear_df, raw_view):
     profiles = profile_columns(linear_df, raw_view(linear_df))
     # every y value is unique but it is genuine continuous data, not an id

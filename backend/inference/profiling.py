@@ -53,7 +53,10 @@ def _datetime_fraction(raw_series: pd.Series) -> float:
 
 
 def _numeric_stats(series: pd.Series) -> dict:
-    s = series.dropna()
+    # Reset to a 0-based positional index so outlier positions below are true row
+    # numbers (scan_quality resolves them positionally); the caller's frame may
+    # carry a non-range index, e.g. when pandas infers a row-label column.
+    s = series.reset_index(drop=True).dropna()
     if s.empty:
         return {}
     q1 = float(s.quantile(0.25))
@@ -66,8 +69,9 @@ def _numeric_stats(series: pd.Series) -> dict:
         m3 = (s < q1 - 3 * iqr) | (s > q3 + 3 * iqr)
         m5 = (s < q1 - 5 * iqr) | (s > q3 + 5 * iqr)
         out3, out5 = int(m3.sum()), int(m5.sum())
-        # (0-based row position, value) for the flagged rows — scan_quality turns
-        # these into human row numbers (and id-column values when one exists).
+        # (0-based row position, value) for the flagged rows — s now has a
+        # positional index, so i is the row offset. scan_quality turns these into
+        # human row numbers (and id-column values when one exists).
         pos3 = [[int(i), float(v)] for i, v in s[m3].items()][:25]
         pos5 = [[int(i), float(v)] for i, v in s[m5].items()][:25]
     return {

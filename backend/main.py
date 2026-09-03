@@ -5,12 +5,15 @@ seconds; streaming progress for very large files is future work.
 """
 
 import io
+import logging
 
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from inference import run_inference
+
+logger = logging.getLogger("statguard")
 
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # 25 MiB
 
@@ -54,5 +57,6 @@ async def infer(file: UploadFile = File(...)):
 
     try:
         return run_inference(df, raw_df, file.filename or "uploaded.csv")
-    except Exception as exc:  # pragma: no cover - defensive catch-all
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {exc}") from exc
+    except Exception as exc:  # defensive catch-all
+        logger.exception("run_inference failed for %r", file.filename)
+        raise HTTPException(status_code=500, detail="Analysis failed while processing this file.") from exc

@@ -4,8 +4,15 @@ export function downloadFile(filename, content, type = "text/plain") {
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
+  a.style.display = "none";
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  // Defer cleanup: some browsers abort the download if the URL is revoked or the
+  // anchor is removed before the click is processed.
+  setTimeout(() => {
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, 0);
 }
 
 export function fmt(value, digits = 3) {

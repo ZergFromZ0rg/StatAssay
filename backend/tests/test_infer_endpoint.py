@@ -44,6 +44,12 @@ def test_infer_returns_report_shape():
     assert body["report_markdown"].startswith("# StatGuard report")
 
 
+def test_report_tool_version_matches_package_constant():
+    from inference import TOOL_VERSION
+
+    assert _post(SAMPLE).json()["meta"]["tool_version"] == TOOL_VERSION
+
+
 def test_infer_attaches_charts():
     body = _post(SAMPLE).json()
     numeric = [c for c in body["profile"]["columns"] if c["type"] == "numeric"]
