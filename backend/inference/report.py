@@ -192,7 +192,7 @@ def _markdown(report: dict) -> str:
     m = report["meta"]
     dq = report["data_quality"]
     lines = [
-        f"# StatGuard report — {m['filename']}",
+        f"# Assay report — {m['filename']}",
         "",
         f"- Rows: {m['n_rows']}  ·  Columns: {m['n_cols']}",
         f"- Generated: {m['generated_at']}  ·  Tool version: {m['tool_version']}",

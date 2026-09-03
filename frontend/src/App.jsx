@@ -67,7 +67,7 @@ export default function App() {
       {!report && (
         <div style={{ minHeight: "70vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
           <div style={{ textAlign: "center", marginBottom: 22 }}>
-            <h1 style={{ margin: 0, fontSize: 36, fontWeight: 700, letterSpacing: 0.5 }}>StatGuard</h1>
+            <h1 style={{ margin: 0, fontSize: 36, fontWeight: 700, letterSpacing: 0.5 }}>Assay</h1>
             <p style={{ margin: "6px 0 0 0", fontSize: 15, color: "var(--text-muted)" }}>
               Upload a CSV. Get an automatic statistical inference report.
             </p>
@@ -101,7 +101,7 @@ export default function App() {
             </button>
           </div>
           <p style={{ marginTop: 18, fontSize: 10, color: "var(--text-muted)", maxWidth: 440, textAlign: "center", lineHeight: 1.6 }}>
-            StatGuard tests every applicable pair of variables, corrects for multiple
+            Assay tests every applicable pair of variables, corrects for multiple
             comparisons, and reports only what is statistically and practically notable.
             Results are exploratory — not evidence of causation.
           </p>

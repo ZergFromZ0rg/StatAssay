@@ -20,10 +20,10 @@ export default function Report({ data, onReset }) {
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-          <button type="button" style={utilBtn} onClick={() => downloadFile("statguard_report.md", data.report_markdown, "text/markdown")}>
+          <button type="button" style={utilBtn} onClick={() => downloadFile("assay_report.md", data.report_markdown, "text/markdown")}>
             report.md
           </button>
-          <button type="button" style={utilBtn} onClick={() => downloadFile("statguard_report.json", JSON.stringify(data, null, 2), "application/json")}>
+          <button type="button" style={utilBtn} onClick={() => downloadFile("assay_report.json", JSON.stringify(data, null, 2), "application/json")}>
             report.json
           </button>
           <ExportPanel key={`${meta.filename}:${meta.generated_at}`} data={data} />

@@ -41,7 +41,7 @@ def test_infer_returns_report_shape():
                 "needs_review", "imputation_sensitivity", "all_results", "report_markdown"):
         assert key in body
     assert body["meta"]["n_rows"] == 12
-    assert body["report_markdown"].startswith("# StatGuard report")
+    assert body["report_markdown"].startswith("# Assay report")
 
 
 def test_report_tool_version_matches_package_constant():
