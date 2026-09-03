@@ -49,3 +49,37 @@ a {
 a:hover {
   color: var(--accent-strong);
 }
+
+/* --- PDF export ------------------------------------------------------- */
+#print-root {
+  display: none;
+}
+
+@media print {
+  :root,
+  body {
+    background: #fff;
+  }
+  #root {
+    display: none !important;
+  }
+  #print-root {
+    display: block !important;
+    padding: 0 4mm;
+    color: #1f2b1f;
+  }
+  #print-root .print-item {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin: 0 0 14px;
+  }
+  #print-root .print-item > figcaption {
+    font-size: 10px;
+    color: #5b6a5b;
+    margin-bottom: 3px;
+  }
+  #print-root h1 {
+    font-size: 16px;
+    margin: 0 0 2px;
+  }
+}

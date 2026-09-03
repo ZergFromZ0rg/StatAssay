@@ -367,4 +367,7 @@ def quality_summary(issues: list[dict]) -> str:
     counts = {"high": 0, "medium": 0, "low": 0}
     for i in issues:
         counts[i["severity"]] += 1
-    return f"{counts['high']} high, {counts['medium']} medium, {counts['low']} low"
+    total = sum(counts.values())
+    noun = "issue" if total == 1 else "issues"
+    return (f"{counts['high']} high · {counts['medium']} medium · {counts['low']} low "
+            f"— {total} data-quality {noun}")
