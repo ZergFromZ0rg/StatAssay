@@ -29,7 +29,7 @@ export default function Report({ data, onReset }) {
         </div>
       </div>
 
-      <DataQuality quality={data_quality} />
+      <DataQuality quality={data_quality} profile={profile} />
       <Findings findings={findings} needsReview={needs_review} sensitivity={imputation_sensitivity} />
       <Profile profile={profile} />
       <AllResults allResults={all_results} sweep={sweep} />

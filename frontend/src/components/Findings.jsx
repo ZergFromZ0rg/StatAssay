@@ -40,9 +40,11 @@ function FindingCard({ finding, tone }) {
           </span>
         )}
       </div>
-      {finding.chart && (
-        <div style={{ marginTop: 4 }}>
-          <FindingChart chart={finding.chart} />
+      {finding.charts?.length > 0 && (
+        <div style={{ marginTop: 4, display: "flex", flexWrap: "wrap", gap: 16 }}>
+          {finding.charts.map((c, i) => (
+            <FindingChart key={i} chart={c} />
+          ))}
         </div>
       )}
       <Caveats items={finding.caveats} />

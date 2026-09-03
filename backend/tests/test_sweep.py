@@ -1,3 +1,5 @@
+import pytest
+
 from inference.report import run_inference
 
 
@@ -16,17 +18,24 @@ def test_recovers_linear_relationship(linear_df, raw_view):
     assert any("x1" in f["vars"] and "y" in f["vars"] for f in rep["findings"])
 
 
-def test_regression_finding_carries_a_residual_plot(linear_df, raw_view):
+def test_regression_finding_carries_residual_and_influence_plots(linear_df, raw_view):
     rep = run_inference(linear_df, raw_view(linear_df), "linear.csv")
     entries = rep["findings"] + rep["needs_review"]
     model = next(e for e in entries if e["family"] == "regression_model" and e["vars"] == ["y"])
-    chart = model["chart"]
-    assert chart["type"] == "residual" and chart["outcome"] == "y"
-    assert len(chart["points"]) == chart["n"] == 200
-    assert all(len(p) == 2 for p in chart["points"])
-    # the payload is not duplicated back into the results table
+    by_type = {c["type"]: c for c in model["charts"]}
+
+    resid = by_type["residual"]
+    assert resid["outcome"] == "y"
+    assert len(resid["points"]) == resid["n"] == 200
+    assert all(len(p) == 2 for p in resid["points"])
+
+    inf = by_type["influence"]
+    assert inf["n"] == 200 and inf["threshold"] == pytest.approx(4 / 200)
+    assert all(0 <= p[0] < 200 and p[1] >= 0 for p in inf["points"])
+
+    # neither large payload is duplicated back into the results table
     rm = [r for r in rep["all_results"]["regression_models"] if r["vars"] == ["y"]][0]
-    assert "resid_plot" not in rm["extra"]
+    assert "resid_plot" not in rm["extra"] and "influence_plot" not in rm["extra"]
 
 
 def test_recovers_group_difference(group_df, raw_view):

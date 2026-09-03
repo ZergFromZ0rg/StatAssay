@@ -152,6 +152,41 @@ def residual_series(fitted, resid, cap: int = RESIDUAL_CAP) -> dict | None:
     }
 
 
+INFLUENCE_CAP = 400
+
+
+def influence_series(cooks, cap: int = INFLUENCE_CAP) -> dict | None:
+    """Per-row Cook's distance for a regression, for a stem/leverage plot.
+
+    The most influential rows are always kept even when the rest is subsampled,
+    so a dominant point can't be sampled away.
+    """
+    c = np.asarray(cooks, float)
+    finite = np.isfinite(c)
+    idx_all = np.nonzero(finite)[0]
+    c = c[finite]
+    n = int(c.size)
+    if n < 3:
+        return None
+    threshold = 4.0 / n
+    order = np.argsort(c)[::-1]
+    keep = set(order[: min(n, 20)].tolist())
+    if n > cap:
+        extra = np.random.default_rng(_SEED).choice(n, size=cap, replace=False)
+        keep |= set(extra.tolist())
+    else:
+        keep = set(range(n))
+    sel = sorted(keep)
+    return {
+        "points": [[int(idx_all[i]), float(c[i])] for i in sel],
+        "n": n,
+        "threshold": float(threshold),
+        "n_above": int((c > threshold).sum()),
+        "max": float(c.max()),
+        "sampled": bool(n > cap),
+    }
+
+
 def box_stats(values: np.ndarray) -> dict | None:
     """Tukey five-number summary plus fenced outliers for one group."""
     v = np.asarray(values, float)

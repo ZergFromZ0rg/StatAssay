@@ -55,9 +55,10 @@ def _all_results(sweep: dict) -> dict:
                     "effect_name": r["effect_name"], "effect_value": r["effect_value"],
                     "effect_magnitude": r["effect_magnitude"], "direction": r["direction"],
                     "assumptions": r["assumptions"], "nonparametric_agrees": r["nonparametric_agrees"],
-                    # resid_plot is a chart payload for the headline findings only —
-                    # keep the full results table lean.
-                    "extra": {k: v for k, v in r["extra"].items() if k != "resid_plot"},
+                    # resid_plot / influence_plot are chart payloads for the headline
+                    # findings only — keep the full results table lean.
+                    "extra": {k: v for k, v in r["extra"].items()
+                              if k not in ("resid_plot", "influence_plot")},
                 }
                 for r in rows
             ),
@@ -91,7 +92,14 @@ def _md_table(header: list[str], rows: list[list]) -> list[str]:
     return out
 
 
-def _finding_chart_md(chart: dict) -> list[str]:
+def _finding_charts_md(charts: list) -> list[str]:
+    out = []
+    for chart in charts or []:
+        out += _one_chart_md(chart)
+    return out
+
+
+def _one_chart_md(chart: dict) -> list[str]:
     """A compact table rendering of a finding's chart, for the Markdown export."""
     if not chart:
         return []
@@ -106,6 +114,9 @@ def _finding_chart_md(chart: dict) -> list[str]:
         body = [[g["level"], g["n"], _num(g["median"]), f"{_num(g['q1'])} – {_num(g['q3'])}"]
                 for g in chart["groups"]]
         return ["", *_md_table([chart["cat"], "n", f"median {chart['num']}", "IQR"], body), ""]
+    if chart["type"] == "influence" and chart.get("n_above"):
+        return [f"  - {chart['n_above']} of {chart['n']} rows exceed the 4/n Cook's-distance "
+                f"threshold (max D = {_num(chart['max'], 3)})."]
     return []
 
 
@@ -176,7 +187,7 @@ def _markdown(report: dict) -> str:
                      f"({f['effect_magnitude']})  ·  robustness: {f['robustness']}")
         for c in f["caveats"]:
             lines.append(f"  - {c}")
-        lines += _finding_chart_md(f.get("chart"))
+        lines += _finding_charts_md(f.get("charts"))
         lines.append("")
     if report["needs_review"]:
         lines += ["## Needs manual review", "",
@@ -206,9 +217,10 @@ def _markdown(report: dict) -> str:
 
 
 def _attach_charts(entries: list[dict], cc_df: pd.DataFrame) -> None:
-    """Give each headline finding a plot-ready series drawn from the complete-case frame."""
+    """Give each headline finding its plot-ready series, drawn from the complete-case frame."""
     for e in entries:
-        chart = None
+        charts: list[dict] = []
+        stats = e.get("stats", {})
         if e["family"] == "correlation":
             a, b = e["vars"]
             if a in cc_df.columns and b in cc_df.columns:
@@ -218,26 +230,29 @@ def _attach_charts(entries: list[dict], cc_df: pd.DataFrame) -> None:
                     # rank-based (Spearman) one it would misrepresent the statistic.
                     if e.get("kind") != "pearson":
                         series["trend"] = None
-                    chart = {"type": "scatter", "x": a, "y": b, "kind": e.get("kind"), **series}
+                    charts.append({"type": "scatter", "x": a, "y": b, "kind": e.get("kind"), **series})
         elif e["family"] == "group_difference":
             num, cat = e["vars"]
-            levels = [g["level"] for g in e.get("stats", {}).get("groups", [])]
+            levels = [g["level"] for g in stats.get("groups", [])]
             boxes = _charts.group_box_series(cc_df, num, cat, levels)
             if boxes:
-                chart = {"type": "box", "num": num, "cat": cat, "groups": boxes,
-                         "higher_group": e.get("stats", {}).get("higher_group")}
+                charts.append({"type": "box", "num": num, "cat": cat, "groups": boxes,
+                               "higher_group": stats.get("higher_group")})
         elif e["family"] == "contingency":
             a, b = e["vars"]
-            series = _charts.contingency_series(e.get("stats", {}).get("table", {}), a, b)
+            series = _charts.contingency_series(stats.get("table", {}), a, b)
             if series:
-                chart = {"type": "contingency", **series}
+                charts.append({"type": "contingency", **series})
         elif e["family"] == "regression_model":
-            rp = e.get("stats", {}).pop("resid_plot", None)
+            rp = stats.pop("resid_plot", None)
             if rp:
-                chart = {"type": "residual", "outcome": e["vars"][0],
-                         "bp_p": e.get("stats", {}).get("bp_p"), **rp}
-        if chart:
-            e["chart"] = chart
+                charts.append({"type": "residual", "outcome": e["vars"][0],
+                               "bp_p": stats.get("bp_p"), **rp})
+            inf = stats.pop("influence_plot", None)
+            if inf:
+                charts.append({"type": "influence", "outcome": e["vars"][0], **inf})
+        if charts:
+            e["charts"] = charts
 
 
 def run_inference(df: pd.DataFrame, raw_df: pd.DataFrame, filename: str) -> dict:

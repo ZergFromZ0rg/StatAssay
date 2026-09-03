@@ -76,6 +76,7 @@ def _numeric_stats(series: pd.Series) -> dict:
         "n_outliers_3iqr": out3,
         "n_outliers_5iqr": out5,
         "histogram": charts.histogram(s),
+        "box": charts.box_stats(s.to_numpy(float)),
     }
 
 

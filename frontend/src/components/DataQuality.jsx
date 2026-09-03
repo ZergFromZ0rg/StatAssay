@@ -1,9 +1,16 @@
 import { card, sectionTitle, severityStyle } from "./uiStyles";
+import { DistributionBox } from "./charts";
 
 const SEVERITY_ORDER = ["high", "medium", "low"];
+const SHAPE_KINDS = new Set(["extreme_values", "outliers", "skew", "heavy_tails"]);
 
-export default function DataQuality({ quality }) {
+export default function DataQuality({ quality, profile }) {
   const issues = quality?.issues ?? [];
+
+  const statsByName = new Map((profile?.columns ?? []).map((c) => [c.name, c.stats]));
+  const flaggedCols = [...new Set(
+    issues.filter((i) => SHAPE_KINDS.has(i.kind) && i.column).map((i) => i.column),
+  )].filter((name) => statsByName.get(name)?.box);
   const grouped = SEVERITY_ORDER.map((sev) => ({
     sev,
     items: issues.filter((i) => i.severity === sev),
@@ -48,6 +55,20 @@ export default function DataQuality({ quality }) {
           </div>
         );
       })}
+
+      {flaggedCols.length > 0 && (
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--text-muted)", marginBottom: 6 }}>
+            Flagged distributions
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
+            {flaggedCols.map((name) => {
+              const s = statsByName.get(name);
+              return <DistributionBox key={name} box={s.box} label={name} skew={s.skew} />;
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

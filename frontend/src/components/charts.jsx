@@ -188,6 +188,93 @@ export function ResidualPlot({ chart, width = 300, height = 190 }) {
 }
 
 /* --------------------------------------------------------------------- */
+/* Cook's-distance stem plot (regression influence)                     */
+/* --------------------------------------------------------------------- */
+export function InfluencePlot({ chart, width = 300, height = 150 }) {
+  if (!chart?.points?.length) return null;
+  const { points, n, threshold, n_above: nAbove, sampled } = chart;
+  const w = width;
+  const h = height;
+  const m = { l: 40, r: 8, t: 8, b: 24 };
+  const iw = w - m.l - m.r;
+  const ih = h - m.t - m.b;
+  const yMax = Math.max(chart.max, threshold * 1.3, 1e-9);
+  const sx = (i) => m.l + (n <= 1 ? 0 : (i / (n - 1)) * iw);
+  const sy = (v) => m.t + ih - Math.min(v / yMax, 1) * ih;
+
+  return (
+    <figure style={{ margin: "6px 0 0" }}>
+      <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} role="img"
+           aria-label={`Cook's distance per row for the model of ${chart.outcome}`} style={{ display: "block" }}>
+        <line x1={m.l} y1={m.t} x2={m.l} y2={m.t + ih} stroke={AXIS} strokeWidth="1" />
+        <line x1={m.l} y1={m.t + ih} x2={m.l + iw} y2={m.t + ih} stroke={AXIS} strokeWidth="1" />
+        {points.map((p, k) => {
+          const hot = p[1] > threshold;
+          return (
+            <line key={k} x1={sx(p[0])} y1={m.t + ih} x2={sx(p[0])} y2={sy(p[1])}
+                  stroke={hot ? ACCENT : MUTED} strokeWidth={hot ? 1.3 : 0.8}
+                  opacity={hot ? 0.95 : 0.5}>
+              <title>{`row ${p[0]}: Cook's D = ${p[1].toExponential(2)}`}</title>
+            </line>
+          );
+        })}
+        <line x1={m.l} y1={sy(threshold)} x2={m.l + iw} y2={sy(threshold)}
+              stroke={INK} strokeWidth="1" strokeDasharray="3 2" />
+        <text x={m.l - 3} y={m.t + 6} fontSize="8" fill={MUTED} textAnchor="end">{niceNum(yMax)}</text>
+        <text x={m.l - 3} y={sy(threshold) - 2} fontSize="8" fill={INK} textAnchor="end">4/n</text>
+        <text x={m.l + iw / 2} y={h - 3} fontSize="9" fill={INK} textAnchor="middle">row</text>
+        <text x={9} y={m.t + ih / 2} fontSize="9" fill={INK} textAnchor="middle"
+              transform={`rotate(-90 9 ${m.t + ih / 2})`}>Cook's D</text>
+      </svg>
+      <figcaption style={{ fontSize: 9, color: MUTED, marginTop: 1 }}>
+        {nAbove} of {n} row{n === 1 ? "" : "s"} above the 4/n threshold
+        {sampled ? " · lesser points subsampled" : ""}
+      </figcaption>
+    </figure>
+  );
+}
+
+/* --------------------------------------------------------------------- */
+/* Single-series horizontal box (a column's distribution)               */
+/* --------------------------------------------------------------------- */
+export function DistributionBox({ box, label, skew, width = 200 }) {
+  if (!box) return null;
+  const w = width;
+  const h = 34;
+  const m = { l: 4, r: 8, t: 4, b: 12 };
+  const iw = w - m.l - m.r;
+  const cy = m.t + 9;
+  const lo = Math.min(box.min, box.whisker_lo, ...(box.outliers ?? []));
+  const hi = Math.max(box.max, box.whisker_hi, ...(box.outliers ?? []));
+  const span = hi === lo ? 1 : hi - lo;
+  const sx = (v) => m.l + ((v - lo) / span) * iw;
+
+  return (
+    <figure style={{ margin: 0 }}>
+      <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} role="img"
+           aria-label={`Distribution of ${label}`} style={{ display: "block" }}>
+        <line x1={sx(box.whisker_lo)} y1={cy} x2={sx(box.q1)} y2={cy} stroke={AXIS} />
+        <line x1={sx(box.q3)} y1={cy} x2={sx(box.whisker_hi)} y2={cy} stroke={AXIS} />
+        <line x1={sx(box.whisker_lo)} y1={cy - 4} x2={sx(box.whisker_lo)} y2={cy + 4} stroke={AXIS} />
+        <line x1={sx(box.whisker_hi)} y1={cy - 4} x2={sx(box.whisker_hi)} y2={cy + 4} stroke={AXIS} />
+        <rect x={sx(box.q1)} y={cy - 6} width={Math.max(sx(box.q3) - sx(box.q1), 1)} height={12}
+              fill={ACCENT} opacity={0.2} stroke={ACCENT} strokeWidth="1" />
+        <line x1={sx(box.median)} y1={cy - 6} x2={sx(box.median)} y2={cy + 6} stroke={ACCENT} strokeWidth="2" />
+        {(box.outliers ?? []).map((o, k) => (
+          <circle key={k} cx={sx(o)} cy={cy} r={1.9} fill="var(--warning-text)" />
+        ))}
+        <text x={m.l} y={h - 2} fontSize="8" fill={MUTED}>{niceNum(lo)}</text>
+        <text x={w - m.r} y={h - 2} fontSize="8" fill={MUTED} textAnchor="end">{niceNum(hi)}</text>
+      </svg>
+      <figcaption style={{ fontSize: 9, color: MUTED, textAlign: "center", marginTop: 1 }}>
+        {label}
+        {typeof skew === "number" && Math.abs(skew) >= 1 ? ` · skew ${skew.toFixed(1)}` : ""}
+      </figcaption>
+    </figure>
+  );
+}
+
+/* --------------------------------------------------------------------- */
 /* Horizontal box plot, one row per group                               */
 /* --------------------------------------------------------------------- */
 export function BoxPlot({ chart, width = 300, rowH = 26 }) {
@@ -402,5 +489,6 @@ export function FindingChart({ chart }) {
   if (chart.type === "box") return <BoxPlot chart={chart} />;
   if (chart.type === "contingency") return <ContingencyBars chart={chart} />;
   if (chart.type === "residual") return <ResidualPlot chart={chart} />;
+  if (chart.type === "influence") return <InfluencePlot chart={chart} />;
   return null;
 }

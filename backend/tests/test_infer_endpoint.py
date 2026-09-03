@@ -49,9 +49,11 @@ def test_infer_attaches_charts():
     numeric = [c for c in body["profile"]["columns"] if c["type"] == "numeric"]
     assert numeric and all(c["stats"]["histogram"]["counts"] for c in numeric)
 
+    assert numeric and all(c["stats"]["box"]["median"] is not None for c in numeric)
+
     corr = [f for f in body["findings"] if f["family"] == "correlation"]
     assert corr, "expected a correlation finding for a perfectly linear column pair"
-    chart = corr[0]["chart"]
+    chart = corr[0]["charts"][0]
     assert chart["type"] == "scatter"
     assert len(chart["points"]) == chart["n"]
     assert chart["trend"] is not None
@@ -90,7 +92,7 @@ def test_infer_attaches_contingency_chart():
     body = _post("\n".join(rows).encode()).json()
     cont = [f for f in body["findings"] + body["needs_review"] if f["family"] == "contingency"]
     assert cont, "expected a contingency finding for two strongly associated categoricals"
-    chart = cont[0]["chart"]
+    chart = cont[0]["charts"][0]
     assert chart["type"] == "contingency"
     assert len(chart["counts"]) == len(chart["rows"])
     assert all(len(r) == len(chart["cols"]) for r in chart["counts"])

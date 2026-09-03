@@ -323,10 +323,12 @@ def regressions(df: pd.DataFrame, numeric_cols: list[str], categorical_cols: lis
         except Exception:
             bp_p = float("nan")
         shap_p = float(stats.shapiro(resid).pvalue) if 3 <= len(resid) <= 5000 else float("nan")
+        cooks = None
         try:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                cooks_max = float(np.nanmax(fit.get_influence().cooks_distance[0]))
+                cooks = fit.get_influence().cooks_distance[0]
+            cooks_max = float(np.nanmax(cooks))
         except Exception:
             cooks_max = float("nan")
         vif_max = float("nan")
@@ -369,7 +371,8 @@ def regressions(df: pd.DataFrame, numeric_cols: list[str], categorical_cols: lis
                    "vif_max": vif_max, "n_predictors": int(p_eff),
                    "n_drop_frac": float(n_drop_frac), "note": note,
                    "resid_plot": charts.residual_series(fit.fittedvalues.to_numpy(),
-                                                        resid.to_numpy())},
+                                                        resid.to_numpy()),
+                   "influence_plot": charts.influence_series(cooks) if cooks is not None else None},
         ))
 
         y_std = y.std(ddof=1)

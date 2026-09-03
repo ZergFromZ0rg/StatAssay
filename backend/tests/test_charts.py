@@ -86,6 +86,23 @@ def test_box_stats_quartile_order():
     b = charts.box_stats(np.array([1.0, 2, 3, 4, 5, 6, 7, 8, 9, 100]))
     assert b["min"] <= b["q1"] <= b["median"] <= b["q3"] <= b["max"]
     assert 100.0 in b["outliers"]
+    assert b["whisker_hi"] <= b["q3"] + 1.5 * (b["q3"] - b["q1"]) + 1e-9
+
+
+def test_influence_series_keeps_the_spike(rng):
+    cooks = np.abs(rng.normal(0, 0.001, 800))
+    cooks[400] = 5.0  # a dominant point
+    s = charts.influence_series(cooks, cap=200)
+    assert s["n"] == 800 and s["sampled"] is True
+    assert s["threshold"] == 4 / 800
+    assert any(p[0] == 400 and p[1] == 5.0 for p in s["points"])  # spike survives subsampling
+    assert s["n_above"] >= 1 and s["max"] == 5.0
+
+
+def test_influence_series_small_input():
+    assert charts.influence_series([0.1, 0.2]) is None
+    s = charts.influence_series([0.1, 0.2, 0.3, 0.4, 0.5])
+    assert s["sampled"] is False and len(s["points"]) == 5
 
 
 def test_group_box_series_orders_by_levels():
