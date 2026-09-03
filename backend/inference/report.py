@@ -13,7 +13,7 @@ from .preprocess import build_frames, select_modeling_columns, split_types
 from .profiling import profile_columns, quality_summary, scan_quality
 from .sweep import run_sweep
 
-TOOL_VERSION = "2.0.0"
+TOOL_VERSION = "2.1.0"
 
 METHODOLOGY = (
     "Every applicable pair of variables was tested automatically across three families: "
