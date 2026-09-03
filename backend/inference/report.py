@@ -84,11 +84,16 @@ def _num(v, digits: int = 2) -> str:
     return f"{f:.{digits}f}"
 
 
+def _md_cell(v) -> str:
+    """One table cell: collapse whitespace and escape the pipe so the row can't split."""
+    return " ".join(str(v).split()).replace("|", "\\|")
+
+
 def _md_table(header: list[str], rows: list[list]) -> list[str]:
-    out = ["| " + " | ".join(str(h) for h in header) + " |",
+    out = ["| " + " | ".join(_md_cell(h) for h in header) + " |",
            "| " + " | ".join("---" for _ in header) + " |"]
     for r in rows:
-        out.append("| " + " | ".join(str(c) for c in r) + " |")
+        out.append("| " + " | ".join(_md_cell(c) for c in r) + " |")
     return out
 
 
@@ -275,7 +280,9 @@ def run_inference(df: pd.DataFrame, raw_df: pd.DataFrame, filename: str) -> dict
     numeric_cols, categorical_cols = split_types(profiles, modeling_cols)
 
     primary = run_sweep(cc_df, numeric_cols, categorical_cols, profiles_by_name, n_rows)
-    imputed = run_sweep(imp_df, numeric_cols, categorical_cols, profiles_by_name, n_rows) if imp_df is not None else None
+    imputed = (run_sweep(imp_df, numeric_cols, categorical_cols, profiles_by_name, n_rows,
+                         with_charts=False)
+               if imp_df is not None else None)
 
     _f.apply_fdr(primary)
     if imputed is not None:

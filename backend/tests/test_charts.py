@@ -189,6 +189,14 @@ def test_correlation_matrix_needs_two_columns():
     assert charts.correlation_matrix(["only"], []) is None
 
 
+def test_correlation_matrix_skips_non_finite_values():
+    rows = [_corr_row("x", "y", float("nan")), _corr_row("y", "z", None), _corr_row("x", "z", 0.6)]
+    m = charts.correlation_matrix(["x", "y", "z"], rows)
+    pairs = {(c["i"], c["j"]) for c in m["cells"] if c["i"] != c["j"]}
+    assert pairs == {(0, 2)}  # only the finite x–z pair survives; no null cells emitted
+    assert all(c["value"] is not None for c in m["cells"])
+
+
 def test_correlation_matrix_caps_and_flags_truncation():
     cols = [f"c{i}" for i in range(40)]
     m = charts.correlation_matrix(cols, [])

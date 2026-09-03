@@ -139,6 +139,7 @@ def residual_series(fitted, resid, cap: int = RESIDUAL_CAP) -> dict | None:
     n = int(f.size)
     if n < 3:
         return None
+    fitted_lim, resid_lim = _robust_limits(f), _robust_limits(r)  # from all rows, before subsampling
     sampled = n > cap
     if sampled:
         idx = np.random.default_rng(_SEED).choice(n, size=cap, replace=False)
@@ -148,8 +149,8 @@ def residual_series(fitted, resid, cap: int = RESIDUAL_CAP) -> dict | None:
         "points": [[float(a), float(b)] for a, b in zip(f, r)],
         "n": n,
         "sampled": bool(sampled),
-        "fitted_lim": _robust_limits(f),
-        "resid_lim": _robust_limits(r),
+        "fitted_lim": fitted_lim,
+        "resid_lim": resid_lim,
     }
 
 
@@ -342,10 +343,13 @@ def correlation_matrix(numeric_cols: list[str], correlation_rows: list[dict]) ->
         a, b = r["vars"]
         if a not in idx or b not in idx:
             continue
+        value = r["effect_value"]
+        if value is None or not np.isfinite(value):
+            continue  # a degenerate pair — leave the cell blank rather than emit null
         i, j = sorted((idx[a], idx[b]))
         cells.append({
             "i": i, "j": j,
-            "value": r["effect_value"],
+            "value": float(value),
             "q": r.get("q_value"),
             "kind": r["kind"],
             "n": r["n"],

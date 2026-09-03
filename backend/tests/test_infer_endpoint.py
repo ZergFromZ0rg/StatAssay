@@ -83,6 +83,20 @@ def test_markdown_export_embeds_contingency_table():
     assert "| cat \\ region |" in md
 
 
+def test_markdown_table_escapes_pipe_in_names():
+    # a column name containing a pipe must be escaped so it can't split a table row
+    rows = ["a|b,c|d"]
+    for i in range(1, 21):
+        rows.append(f"{i},{(i * 7) % 11}")
+    md = _post("\n".join(rows).encode()).json()["report_markdown"]
+    assert "## Correlation matrix" in md
+    assert "a\\|b" in md and "c\\|d" in md
+    # no correlation-matrix row contains an unescaped pipe inside a cell
+    for ln in md.splitlines():
+        if ln.startswith("| ") and "\\|b" in ln:
+            assert ln.replace("\\|", "").count("|") in (3, 4)  # 2 or 3 cells, clean separators
+
+
 def test_infer_attaches_contingency_chart():
     rows = ["cat,region"]
     for i in range(120):

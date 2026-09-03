@@ -38,6 +38,28 @@ def test_regression_finding_carries_residual_and_influence_plots(linear_df, raw_
     assert "resid_plot" not in rm["extra"] and "influence_plot" not in rm["extra"]
 
 
+def test_imputed_sweep_skips_chart_series(messy_df, raw_view):
+    # messy_df has missing values, so the imputed pass runs; its regression results
+    # must not carry the plot payloads (they would be discarded anyway).
+    from inference.preprocess import build_frames, select_modeling_columns, split_types
+    from inference.profiling import profile_columns
+    from inference.sweep import run_sweep
+
+    profiles = profile_columns(messy_df, raw_view(messy_df))
+    modeling, _ = select_modeling_columns(profiles, messy_df)
+    _, imp_df, has_missing = build_frames(messy_df, profiles, modeling)
+    num, cat = split_types(profiles, modeling)
+    assert has_missing and imp_df is not None
+
+    imputed = run_sweep(imp_df, num, cat, {p["name"]: p for p in profiles}, len(messy_df),
+                        with_charts=False)
+    for r in imputed["regression_model"]:
+        assert r["extra"].get("resid_plot") is None
+        assert r["extra"].get("influence_plot") is None
+    for r in imputed["regression_coefficient"]:
+        assert r["extra"].get("avp_plot") is None
+
+
 def test_coefficient_finding_carries_an_added_variable_plot(linear_df, raw_view):
     rep = run_inference(linear_df, raw_view(linear_df), "linear.csv")
     entries = rep["findings"] + rep["needs_review"]

@@ -274,7 +274,7 @@ def _design(df: pd.DataFrame, outcome: str, predictors: list[str], profiles_by_n
 
 
 def regressions(df: pd.DataFrame, numeric_cols: list[str], categorical_cols: list[str],
-                profiles_by_name: dict, n_total: int):
+                profiles_by_name: dict, n_total: int, with_charts: bool = True):
     models, coefs = [], []
     for outcome in numeric_cols:
         predictors = [c for c in numeric_cols if c != outcome] + categorical_cols
@@ -371,8 +371,9 @@ def regressions(df: pd.DataFrame, numeric_cols: list[str], categorical_cols: lis
                    "vif_max": vif_max, "n_predictors": int(p_eff),
                    "n_drop_frac": float(n_drop_frac), "note": note,
                    "resid_plot": charts.residual_series(fit.fittedvalues.to_numpy(),
-                                                        resid.to_numpy()),
-                   "influence_plot": charts.influence_series(cooks) if cooks is not None else None},
+                                                        resid.to_numpy()) if with_charts else None,
+                   "influence_plot": (charts.influence_series(cooks)
+                                      if with_charts and cooks is not None else None)},
         ))
 
         y_std = y.std(ddof=1)
@@ -387,7 +388,8 @@ def regressions(df: pd.DataFrame, numeric_cols: list[str], categorical_cols: lis
             # A coefficient can only become a finding when q < 0.05, and q >= raw p,
             # so skip the partial-regression plot for clearly-null terms.
             avp = None
-            if np.isfinite(fit.pvalues[term]) and fit.pvalues[term] < 0.05 and term in X.columns:
+            if (with_charts and np.isfinite(fit.pvalues[term])
+                    and fit.pvalues[term] < 0.05 and term in X.columns):
                 avp = charts.added_variable_series(y.to_numpy(float), X, term)
             coefs.append(_result(
                 family="regression_coefficient", kind="coef", vars=[outcome, term], n=n,
@@ -412,8 +414,11 @@ def regressions(df: pd.DataFrame, numeric_cols: list[str], categorical_cols: lis
 
 
 def run_sweep(df: pd.DataFrame, numeric_cols: list[str], categorical_cols: list[str],
-              profiles_by_name: dict, n_total: int) -> dict:
-    models, coefs = regressions(df, numeric_cols, categorical_cols, profiles_by_name, n_total)
+              profiles_by_name: dict, n_total: int, with_charts: bool = True) -> dict:
+    # ``with_charts`` is False for the imputed pass — that sweep is only compared for
+    # q-value stability and never serialised, so its plot series would be discarded.
+    models, coefs = regressions(df, numeric_cols, categorical_cols, profiles_by_name,
+                                n_total, with_charts=with_charts)
     return {
         "correlation": correlations(df, numeric_cols, profiles_by_name),
         "group_difference": group_differences(df, numeric_cols, categorical_cols),

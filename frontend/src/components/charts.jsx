@@ -2,6 +2,8 @@
    these components only map numbers to coordinates. Colours come from CSS vars
    so both themes work. */
 
+import { useId } from "react";
+
 const AXIS = "var(--border-strong)";
 const INK = "var(--text)";
 const MUTED = "var(--text-muted)";
@@ -72,11 +74,11 @@ export function Histogram({ hist, label, width = 200, height = 74 }) {
 /* Scatter with least-squares trend line                                */
 /* --------------------------------------------------------------------- */
 export function Scatter({ chart, width = 300, height = 200 }) {
+  const clipId = "c" + useId().replace(/:/g, "");
   if (!chart?.points?.length) return null;
   const { points, trend, x: xLabel, y: yLabel, n, sampled, clipped } = chart;
   const w = width;
   const h = height;
-  const clipId = `clip-${xLabel}-${yLabel}`.replace(/[^a-zA-Z0-9-]/g, "_");
   const m = { l: 36, r: 8, t: 8, b: 26 };
   const iw = w - m.l - m.r;
   const ih = h - m.t - m.b;
@@ -133,11 +135,11 @@ export function Scatter({ chart, width = 300, height = 200 }) {
 /* Residuals vs fitted values                                           */
 /* --------------------------------------------------------------------- */
 export function ResidualPlot({ chart, width = 300, height = 190 }) {
+  const clipId = "r" + useId().replace(/:/g, "");
   if (!chart?.points?.length) return null;
   const { points, n, sampled, bp_p: bpP } = chart;
   const w = width;
   const h = height;
-  const clipId = `rclip-${chart.outcome}`.replace(/[^a-zA-Z0-9-]/g, "_");
   const m = { l: 40, r: 8, t: 8, b: 26 };
   const iw = w - m.l - m.r;
   const ih = h - m.t - m.b;
@@ -191,11 +193,11 @@ export function ResidualPlot({ chart, width = 300, height = 190 }) {
 /* Added-variable (partial regression) plot                             */
 /* --------------------------------------------------------------------- */
 export function AddedVariablePlot({ chart, width = 300, height = 200 }) {
+  const clipId = "a" + useId().replace(/:/g, "");
   if (!chart?.points?.length) return null;
   const { points, trend, term, outcome, n, sampled } = chart;
   const w = width;
   const h = height;
-  const clipId = `avp-${outcome}-${term}`.replace(/[^a-zA-Z0-9-]/g, "_");
   const m = { l: 40, r: 8, t: 8, b: 28 };
   const iw = w - m.l - m.r;
   const ih = h - m.t - m.b;
@@ -264,7 +266,10 @@ export function InfluencePlot({ chart, width = 300, height = 150 }) {
   const iw = w - m.l - m.r;
   const ih = h - m.t - m.b;
   const yMax = Math.max(chart.max, threshold * 1.3, 1e-9);
-  const sx = (i) => m.l + (n <= 1 ? 0 : (i / (n - 1)) * iw);
+  // points carry the original row index (which skips NaN-filtered rows), so scale
+  // x by the largest index present rather than the finite-row count.
+  const maxRow = points[points.length - 1][0] || 1;
+  const sx = (i) => m.l + (i / maxRow) * iw;
   const sy = (v) => m.t + ih - Math.min(v / yMax, 1) * ih;
 
   return (
@@ -521,14 +526,14 @@ export function CorrelationHeatmap({ matrix, maxWidth = 460 }) {
                   <rect x={x} y={y} width={cell - 1} height={cell - 1}
                         fill={heatFill(v)} stroke="var(--panel)" strokeWidth="0.5">
                     <title>
-                      {c && c.kind !== "identity"
-                        ? `${rowName} × ${colName}: ${c.kind === "spearman" ? "ρ" : "r"} = ${v.toFixed(2)} · q = ${c.q == null ? "—" : c.q.toExponential(1)} · n = ${c.n}`
-                        : i === j
+                      {i === j
                         ? rowName
+                        : c && c.kind !== "identity" && v != null
+                        ? `${rowName} × ${colName}: ${c.kind === "spearman" ? "ρ" : "r"} = ${v.toFixed(2)} · q = ${c.q == null ? "—" : c.q.toExponential(1)} · n = ${c.n}`
                         : `${rowName} × ${colName}: not tested`}
                     </title>
                   </rect>
-                  {showText && v !== null && i !== j && (
+                  {showText && v != null && i !== j && (
                     <text x={x + (cell - 1) / 2} y={y + (cell - 1) / 2 + 3} fontSize="8"
                           fill={INK} textAnchor="middle">
                       {v.toFixed(2).replace(/^(-?)0\./, "$1.")}
