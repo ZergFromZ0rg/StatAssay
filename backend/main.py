@@ -1,4 +1,4 @@
-"""Assay API — upload a CSV, get an automatic statistical inference report.
+"""StatAssay API — upload a CSV, get an automatic statistical inference report.
 
 A single synchronous endpoint. A full sweep of a <=40-column frame completes in a few
 seconds; streaming progress for very large files is future work.
@@ -13,11 +13,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from inference import run_inference
 
-logger = logging.getLogger("assay")
+logger = logging.getLogger("statassay")
 
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # 25 MiB
 
-app = FastAPI(title="Assay")
+app = FastAPI(title="StatAssay")
 
 app.add_middleware(
     CORSMiddleware,
@@ -33,7 +33,7 @@ app.add_middleware(
 
 @app.get("/")
 def root():
-    return {"status": "ok", "service": "assay"}
+    return {"status": "ok", "service": "statassay"}
 
 
 @app.post("/infer")

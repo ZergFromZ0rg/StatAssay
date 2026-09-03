@@ -1,6 +1,6 @@
-# Assay
+# StatAssay
 
-Point Assay at a CSV and it runs the exploratory-statistics pass for you: it profiles
+Point StatAssay at a CSV and it runs the exploratory-statistics pass for you: it profiles
 every column, audits data quality, then sweeps every applicable pair of variables for
 association — correcting for multiple comparisons and keeping only what is both
 statistically and practically notable. Nothing to configure.
@@ -22,11 +22,11 @@ fresh data, not evidence of causation.
 ## What it solves
 
 - **The blank-CSV problem.** Manual exploratory analysis is slow and easy to do
-  unevenly. Assay runs the same full battery every time — correlation (numeric × numeric),
+  unevenly. StatAssay runs the same full battery every time — correlation (numeric × numeric),
   group differences (numeric × categorical), contingency (categorical × categorical),
   and an OLS regression for every numeric column.
 - **Multiple comparisons.** Running many tests by hand and reading off `p < 0.05`
-  inflates false positives. Assay applies a Benjamini–Hochberg FDR correction within
+  inflates false positives. StatAssay applies a Benjamini–Hochberg FDR correction within
   each test family and reports a **finding** only when `q < 0.05` *and* the effect size
   is at least medium.
 - **Silent data-quality failures.** Every issue is scored and listed by severity;
@@ -65,7 +65,7 @@ From the report toolbar:
 - The pairwise sweep runs on up to 40 analysable columns; any beyond that are listed but
   skipped.
 - Date/time columns are profiled but not analysed.
-- Everything is associational: Assay does not fit predictive models or estimate causal
+- Everything is associational: StatAssay does not fit predictive models or estimate causal
   effects.
 
 ## Backend
